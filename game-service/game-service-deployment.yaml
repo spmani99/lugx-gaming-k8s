@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: game
-          image: lugx-game-service:latest
-          imagePullPolicy: Never
+          image: spmani99/game-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3001
           env:
@@ -30,11 +30,15 @@ spec:
                   name: gamedb-secret
                   key: root_password
             - name: DB_HOST
-              value: "host.docker.internal"
+              value: "lugx-games-mysql.ca1uo2uoa8cu.us-east-1.rds.amazonaws.com"
             - name: DB_PORT
               value: "3306"
             - name: DB_NAME
-              value: "game_db"
+              value: "game_service_db"
+            - name: API_KEY
+              value: "lgx_admin_z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4"
+            - name: PORT
+              value: "3001"
 
 ---
 apiVersion: v1

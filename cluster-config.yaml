@@ -1,0 +1,44 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: lugx-gaming-cluster
+  region: us-east-1
+  version: "1.28"
+
+managedNodeGroups:
+  - name: lugx-workers
+    instanceType: t3.small
+    minSize: 1
+    maxSize: 3
+    desiredCapacity: 2
+    volumeSize: 20
+    ssh:
+      allow: true
+    labels:
+      role: worker
+      environment: development
+    tags:
+      Environment: development
+      Project: lugx-gaming
+      Student: "true"
+      Account: "654722280806"
+    iam:
+      withAddonPolicies:
+        imageBuilder: true
+        autoScaler: true
+        certManager: true
+        efs: true
+        ebs: true
+        cloudWatch: true
+
+vpc:
+  cidr: 192.168.0.0/16
+  nat:
+    gateway: Single
+
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: aws-ebs-csi-driver

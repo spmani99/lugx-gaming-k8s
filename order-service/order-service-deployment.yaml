@@ -14,11 +14,17 @@ spec:
     spec:
       containers:
         - name: order
-          image: lugx-order-service:latest
-          imagePullPolicy: Never
+          image: spmani99/order-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3002
           env:
+            - name: DB_HOST
+              value: "lugx-games-mysql.ca1uo2uoa8cu.us-east-1.rds.amazonaws.com"
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_NAME
+              value: "order_service_db"
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
@@ -29,12 +35,10 @@ spec:
                 secretKeyRef:
                   name: orderdb-secret
                   key: root_password
-            - name: DB_HOST
-              value: "host.docker.internal"
-            - name: DB_PORT
-              value: "3306"
-            - name: DB_NAME
-              value: "order_db"
+            - name: API_KEY
+              value: "lgx_admin_z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4"
+            - name: PORT
+              value: "3002"
 
 ---
 apiVersion: v1
