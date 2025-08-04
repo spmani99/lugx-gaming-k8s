@@ -18,7 +18,7 @@ spec:
         app: game
     spec:
       containers:
-        - name: game
+        - name: game-service
           image: spmani99/game-service:latest
           imagePullPolicy: Always
           ports:

@@ -18,7 +18,7 @@ spec:
         app: order
     spec:
       containers:
-        - name: order
+        - name: order-service
           image: spmani99/order-service:latest
           imagePullPolicy: Always
           ports:
