@@ -1,0 +1,118 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+/* You'll need to copy all the CSS from templatemo-lugx-gaming.css */
+/* For now, here are some essential styles */
+
+body {
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.header-area {
+  background-color: #27292a;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.main-nav {
+  min-height: 80px;
+  background: transparent;
+}
+
+.main-nav .logo {
+  float: left;
+  margin-top: 27px;
+}
+
+.main-nav .nav {
+  float: right;
+  margin-top: 27px;
+}
+
+.main-nav .nav li {
+  padding-left: 20px;
+}
+
+.main-nav .nav li:last-child {
+  padding-right: 0px;
+}
+
+.main-nav .nav li a {
+  display: block;
+  font-weight: 500;
+  font-size: 14px;
+  color: #fff;
+  text-transform: uppercase;
+  transition: all .3s;
+  height: 40px;
+  line-height: 40px;
+  border: transparent;
+  letter-spacing: 1px;
+}
+
+.main-nav .nav li a:hover,
+.main-nav .nav li a.active {
+  color: #ee5007;
+}
+
+.page-heading {
+  background-image: url('./assets/images/page-heading-bg.jpg');
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  padding: 110px 0px;
+  text-align: center;
+}
+
+.page-heading h3 {
+  font-size: 48px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.page-heading .breadcrumb {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.page-heading .breadcrumb a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.trending-filter {
+  text-align: center;
+  margin-bottom: 70px;
+}
+
+.trending-filter li {
+  display: inline-block;
+  margin: 0px 5px;
+}
+
+.trending-filter li button {
+  font-size: 15px;
+  color: #fff;
+  background: #1f2122;
+  padding: 12px 25px;
+  border-radius: 5px;
+  font-weight: 400;
+  text-transform: capitalize;
+  transition: all .3s;
+  border: none;
+  cursor: pointer;
+}
+
+.trending-filter li button:hover,
+.trending-filter li button.is_active {
+  background: #ee5007;
+}
+
+/* Add more styles as needed from the original CSS */

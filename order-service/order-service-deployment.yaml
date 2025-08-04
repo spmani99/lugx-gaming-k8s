@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order
+  template:
+    metadata:
+      labels:
+        app: order
+    spec:
+      containers:
+        - name: order
+          image: lugx-order-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3002
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: orderdb-secret
+                  key: root_username
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: orderdb-secret
+                  key: root_password
+            - name: DB_HOST
+              value: "host.docker.internal"
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_NAME
+              value: "order_db"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+spec:
+  type: ClusterIP
+  selector:
+    app: order
+  ports:
+    - protocol: TCP
+      port: 3002
+      targetPort: 3002

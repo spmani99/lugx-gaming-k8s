@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics
+  template:
+    metadata:
+      labels:
+        app: analytics
+    spec:
+      containers:
+        - name: analytics
+          image: lugx-analytics-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3003
+          env:
+            - name: DEBUG_ANALYTICS
+              value: "false"
+            - name: CLICKHOUSE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-secret
+                  key: clickhouse_url
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-secret
+                  key: clickhouse_user
+            - name: CLICKHOUSE_PASSWORD_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-secret
+                  key: clickhouse_password
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-secret
+                  key: aws_region
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-secret
+                  key: aws_access_key_id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-secret
+                  key: aws_secret_access_key
+            - name: S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-secret
+                  key: s3_bucket_name
+            - name: PORT
+              value: "3003"
+            - name: UPLOAD_INTERVAL_MINUTES
+              value: "3"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+spec:
+  type: ClusterIP
+  selector:
+    app: analytics
+  ports:
+    - protocol: TCP
+      port: 3003
+      targetPort: 3003 

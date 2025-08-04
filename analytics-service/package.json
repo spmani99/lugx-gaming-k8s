@@ -1,0 +1,31 @@
+{
+  "name": "analytics-service", 
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "analytics",
+    "clickhouse", 
+    "s3",
+    "gaming",
+    "tracking"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Analytics service for lugx gaming platform with ClickHouse and S3 export",
+  "dependencies": {
+    "@clickhouse/client": "^1.12.0",
+    "@aws-sdk/client-s3": "^3.478.0",
+    "axios": "^1.6.2",
+    "cors": "^2.8.5", 
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+}
