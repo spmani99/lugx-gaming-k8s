@@ -262,50 +262,48 @@ jobs:
         
         # Create staging-specific ingress with different host
         echo "🌐 Creating staging ingress..."
-        cat > staging-ingress.yaml << 'EOF'
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: lugx-staging-ingress
-  namespace: lugx-staging
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: lugx-staging.local
-      http:
-        paths:
-          - path: /()(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: frontend
-                port:
-                  number: 80
-          - path: /api/games(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: game-service
-                port:
-                  number: 3001
-          - path: /api/orders(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: order-service
-                port:
-                  number: 3002
-          - path: /api/analytics(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: analytics-service
-                port:
-                  number: 3003
-EOF
+        echo "apiVersion: networking.k8s.io/v1" > staging-ingress.yaml
+        echo "kind: Ingress" >> staging-ingress.yaml
+        echo "metadata:" >> staging-ingress.yaml
+        echo "  name: lugx-staging-ingress" >> staging-ingress.yaml
+        echo "  namespace: lugx-staging" >> staging-ingress.yaml
+        echo "  annotations:" >> staging-ingress.yaml
+        echo "    nginx.ingress.kubernetes.io/rewrite-target: /\\$2" >> staging-ingress.yaml
+        echo "    nginx.ingress.kubernetes.io/use-regex: \"true\"" >> staging-ingress.yaml
+        echo "spec:" >> staging-ingress.yaml
+        echo "  ingressClassName: nginx" >> staging-ingress.yaml
+        echo "  rules:" >> staging-ingress.yaml
+        echo "    - host: lugx-staging.local" >> staging-ingress.yaml
+        echo "      http:" >> staging-ingress.yaml
+        echo "        paths:" >> staging-ingress.yaml
+        echo "          - path: /()(.*)" >> staging-ingress.yaml
+        echo "            pathType: ImplementationSpecific" >> staging-ingress.yaml
+        echo "            backend:" >> staging-ingress.yaml
+        echo "              service:" >> staging-ingress.yaml
+        echo "                name: frontend" >> staging-ingress.yaml
+        echo "                port:" >> staging-ingress.yaml
+        echo "                  number: 80" >> staging-ingress.yaml
+        echo "          - path: /api/games(/|\\$)(.*)" >> staging-ingress.yaml
+        echo "            pathType: ImplementationSpecific" >> staging-ingress.yaml
+        echo "            backend:" >> staging-ingress.yaml
+        echo "              service:" >> staging-ingress.yaml
+        echo "                name: game-service" >> staging-ingress.yaml
+        echo "                port:" >> staging-ingress.yaml
+        echo "                  number: 3001" >> staging-ingress.yaml
+        echo "          - path: /api/orders(/|\\$)(.*)" >> staging-ingress.yaml
+        echo "            pathType: ImplementationSpecific" >> staging-ingress.yaml
+        echo "            backend:" >> staging-ingress.yaml
+        echo "              service:" >> staging-ingress.yaml
+        echo "                name: order-service" >> staging-ingress.yaml
+        echo "                port:" >> staging-ingress.yaml
+        echo "                  number: 3002" >> staging-ingress.yaml
+        echo "          - path: /api/analytics(/|\\$)(.*)" >> staging-ingress.yaml
+        echo "            pathType: ImplementationSpecific" >> staging-ingress.yaml
+        echo "            backend:" >> staging-ingress.yaml
+        echo "              service:" >> staging-ingress.yaml
+        echo "                name: analytics-service" >> staging-ingress.yaml
+        echo "                port:" >> staging-ingress.yaml
+        echo "                  number: 3003" >> staging-ingress.yaml
         
         kubectl apply -f staging-ingress.yaml
         
