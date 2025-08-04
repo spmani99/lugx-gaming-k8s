@@ -1,4 +1,4 @@
-name: 🎮 Lugx Gaming CI/CD Pipeline
+name: Lugx Gaming CI/CD Pipeline
 
 on:
   push:
@@ -18,7 +18,7 @@ env:
 jobs:
   # Job 1: Detect Changed Services
   detect-changes:
-    name: 🔍 Detect Changed Services
+    name: Detect Changed Services
     runs-on: ubuntu-latest
     outputs:
       frontend-changed: ${{ steps.changes.outputs.frontend }}
@@ -28,15 +28,15 @@ jobs:
       any-changes: ${{ steps.changes.outputs.any }}
       
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0  # Get full history for change detection
         
-    - name: 🔍 Detect Service Changes
+    - name: Detect Service Changes
       id: changes
       run: |
-        echo "🔍 Detecting which services have changed..."
+        echo "Detecting which services have changed..."
         
         # Get list of changed files
         CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
@@ -52,22 +52,22 @@ jobs:
         
         if echo "$CHANGED_FILES" | grep -q "^frontend/"; then
           FRONTEND_CHANGED=true
-          echo "✅ Frontend has changes"
+          echo "Frontend has changes"
         fi
         
         if echo "$CHANGED_FILES" | grep -q "^game-service/"; then
           GAME_SERVICE_CHANGED=true
-          echo "✅ Game Service has changes"
+          echo "Game Service has changes"
         fi
         
         if echo "$CHANGED_FILES" | grep -q "^order-service/"; then
           ORDER_SERVICE_CHANGED=true
-          echo "✅ Order Service has changes"
+          echo "Order Service has changes"
         fi
         
         if echo "$CHANGED_FILES" | grep -q "^analytics-service/"; then
           ANALYTICS_SERVICE_CHANGED=true
-          echo "✅ Analytics Service has changes"
+          echo "Analytics Service has changes"
         fi
         
         # For scheduled runs or if no specific changes detected, build all
@@ -76,7 +76,7 @@ jobs:
           GAME_SERVICE_CHANGED=true
           ORDER_SERVICE_CHANGED=true
           ANALYTICS_SERVICE_CHANGED=true
-          echo "🔄 Scheduled run or no changes detected - building all services"
+          echo "Scheduled run or no changes detected - building all services"
         fi
         
         # Set outputs
@@ -88,7 +88,7 @@ jobs:
 
   # Job 2: Build and Test (Selective)
   build-and-test:
-    name: 🔨 Build & Test Services
+    name: Build & Test Services
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.any-changes == 'true'
@@ -113,19 +113,19 @@ jobs:
       analytics-service-image: ${{ steps.meta.outputs.tags }}
       
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: 🐳 Set up Docker Buildx
+    - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
-    - name: 🔑 Login to Docker Hub
+    - name: Login to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ env.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         
-    - name: 📋 Extract Metadata
+    - name: Extract Metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
@@ -136,7 +136,7 @@ jobs:
           type=sha,prefix={{branch}}-
           type=raw,value=latest,enable={{is_default_branch}}
           
-    - name: 🔨 Build and Push Docker Image
+    - name: Build and Push Docker Image
       if: matrix.should-build == 'true'
       uses: docker/build-push-action@v5
       with:
@@ -148,20 +148,20 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         
-    - name: ⏭️ Skip Build (No Changes)
+    - name: Skip Build (No Changes)
       if: matrix.should-build != 'true'
       run: |
-        echo "⏭️ Skipping build for ${{ matrix.service }} - no changes detected"
+        echo "Skipping build for ${{ matrix.service }} - no changes detected"
         echo "Using existing image: ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest"
         
-    - name: 🧪 Run Unit Tests
+    - name: Run Unit Tests
       if: matrix.should-build == 'true'
       run: |
-        echo "🧪 Running unit tests for ${{ matrix.service }}"
+        echo "Running unit tests for ${{ matrix.service }}"
         # Add unit test commands here based on service type
         if [ "${{ matrix.service }}" = "frontend" ]; then
           # For frontend, run tests in the build stage since final image is nginx
-          echo "🧪 Running frontend tests in build stage..."
+          echo "Running frontend tests in build stage..."
           cd ${{ matrix.service }}
           npm install
           npm test -- --coverage --watchAll=false --passWithNoTests
@@ -169,14 +169,14 @@ jobs:
           docker run --rm ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest npm test
         fi
         
-    - name: ⏭️ Skip Tests (No Changes)
+    - name: Skip Tests (No Changes)
       if: matrix.should-build != 'true'
       run: |
-        echo "⏭️ Skipping tests for ${{ matrix.service }} - no changes detected"
+        echo "Skipping tests for ${{ matrix.service }} - no changes detected"
 
   # Job 3: Security Scanning (Selective)
   security-scan:
-    name: 🔒 Security Scanning
+    name: Security Scanning
     runs-on: ubuntu-latest
     needs: [detect-changes, build-and-test]
     if: needs.detect-changes.outputs.any-changes == 'true'
@@ -195,10 +195,10 @@ jobs:
             should-scan: ${{ needs.detect-changes.outputs.analytics-service-changed }}
         
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: 🔍 Run Trivy Vulnerability Scanner
+    - name: Run Trivy Vulnerability Scanner
       if: matrix.should-scan == 'true'
       uses: aquasecurity/trivy-action@master
       with:
@@ -206,55 +206,55 @@ jobs:
         format: 'sarif'
         output: 'trivy-results.sarif'
         
-    - name: 📤 Upload Trivy Scan Results
+    - name: Upload Trivy Scan Results
       if: matrix.should-scan == 'true'
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
         
-    - name: ⏭️ Skip Security Scan (No Changes)
+    - name: Skip Security Scan (No Changes)
       if: matrix.should-scan != 'true'
       run: |
-        echo "⏭️ Skipping security scan for ${{ matrix.service }} - no changes detected"
+        echo "Skipping security scan for ${{ matrix.service }} - no changes detected"
 
-  # Job 3: Deploy to Staging (Rolling Deployment)
+  # Job 4: Deploy to Staging (Rolling Deployment)
   deploy-staging:
-    name: 🚀 Deploy to Staging (Rolling)
+    name: Deploy to Staging (Rolling)
     runs-on: ubuntu-latest
     needs: [build-and-test, security-scan]
     if: github.ref == 'refs/heads/develop'
     environment: staging
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Configure AWS Credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
         
-    - name: 🔧 Setup kubectl
+    - name: Setup kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'latest'
         
-    - name: 🎯 Connect to EKS Cluster
+    - name: Connect to EKS Cluster
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: 🏷️ Create Staging Namespace
+    - name: Create Staging Namespace
       run: |
         kubectl create namespace lugx-staging --dry-run=client -o yaml | kubectl apply -f -
         
-    - name: 🔄 Rolling Deployment to Staging
+    - name: Rolling Deployment to Staging
       run: |
-        echo "🚀 Starting rolling deployment to staging..."
+        echo "Starting rolling deployment to staging..."
         
         # Apply all Kubernetes manifests to staging namespace
-        echo "📋 Applying Kubernetes manifests to staging..."
+        echo "Applying Kubernetes manifests to staging..."
         kubectl apply -f frontend/frontend-deployment.yaml -n lugx-staging
         kubectl apply -f frontend/frontend-secret.yaml -n lugx-staging
         kubectl apply -f game-service/game-service-deployment.yaml -n lugx-staging
@@ -265,7 +265,7 @@ jobs:
         kubectl apply -f analytics-service/analytics-secret.yaml -n lugx-staging
         
         # Create staging-specific ingress with different host
-        echo "🌐 Creating staging ingress..."
+        echo "Creating staging ingress..."
         echo "apiVersion: networking.k8s.io/v1" > staging-ingress.yaml
         echo "kind: Ingress" >> staging-ingress.yaml
         echo "metadata:" >> staging-ingress.yaml
@@ -315,7 +315,7 @@ jobs:
         services=("frontend" "game-service" "order-service" "analytics-service")
         
         for service in "${services[@]}"; do
-          echo "📦 Deploying $service to staging..."
+          echo "Deploying $service to staging..."
           
           # Update deployment with new image
           kubectl set image deployment/${service}-deployment ${service}=${{ env.DOCKER_USERNAME }}/${service}:${{ github.sha }} -n lugx-staging
@@ -327,46 +327,46 @@ jobs:
           kubectl get pods -n lugx-staging -l app=${service}
         done
         
-        echo "✅ Staging deployment completed!"
-        echo "🌐 Staging URL: http://lugx-staging.local"
+        echo "Staging deployment completed!"
+        echo "Staging URL: http://lugx-staging.local"
         
-    - name: 🧪 Run Integration Tests - Staging
+    - name: Run Integration Tests - Staging
       run: |
-        echo "🧪 Running integration tests on staging..."
+        echo "Running integration tests on staging..."
         chmod +x .github/scripts/integration-tests.sh
         .github/scripts/integration-tests.sh staging
 
-  # Job 4: Deploy to Production (Blue-Green)
+  # Job 5: Deploy to Production (Blue-Green)
   deploy-production:
-    name: 🎯 Deploy to Production (Blue-Green)
+    name: Deploy to Production (Blue-Green)
     runs-on: ubuntu-latest
     needs: [deploy-staging]
     if: github.ref == 'refs/heads/main'
     environment: production
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Configure AWS Credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
         
-    - name: 🔧 Setup kubectl
+    - name: Setup kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'latest'
         
-    - name: 🎯 Connect to EKS Cluster
+    - name: Connect to EKS Cluster
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: 🔵 Blue-Green Deployment Setup
+    - name: Blue-Green Deployment Setup
       run: |
-        echo "🔵 Setting up Blue-Green deployment..."
+        echo "Setting up Blue-Green deployment..."
         
         # Determine current active environment
         if kubectl get namespace lugx-blue > /dev/null 2>&1; then
@@ -377,14 +377,14 @@ jobs:
           NEW_ENV="blue"
         fi
         
-        echo "📊 Current active: lugx-$CURRENT_ENV"
-        echo "🆕 Deploying to: lugx-$NEW_ENV"
+        echo "Current active: lugx-$CURRENT_ENV"
+        echo "Deploying to: lugx-$NEW_ENV"
         echo "CURRENT_ENV=$CURRENT_ENV" >> $GITHUB_ENV
         echo "NEW_ENV=$NEW_ENV" >> $GITHUB_ENV
         
-    - name: 🏗️ Deploy to New Environment
+    - name: Deploy to New Environment
       run: |
-        echo "🚀 Deploying to lugx-${{ env.NEW_ENV }}..."
+        echo "Deploying to lugx-${{ env.NEW_ENV }}..."
         
         # Create new environment namespace
         kubectl create namespace lugx-${{ env.NEW_ENV }} --dry-run=client -o yaml | kubectl apply -f -
@@ -399,7 +399,7 @@ jobs:
         services=("frontend" "game-service" "order-service" "analytics-service")
         
         for service in "${services[@]}"; do
-          echo "📦 Deploying $service to lugx-${{ env.NEW_ENV }}..."
+          echo "Deploying $service to lugx-${{ env.NEW_ENV }}..."
           
           # Create temporary deployment file with updated image and namespace
           sed "s|image: spmani99/${service}:latest|image: spmani99/${service}:${{ github.sha }}|g" ${service}/${service}-deployment.yaml > temp-${service}-deployment.yaml
@@ -413,15 +413,15 @@ jobs:
           rm temp-${service}-deployment.yaml
         done
         
-    - name: 🧪 Run Integration Tests - Production
+    - name: Run Integration Tests - Production
       run: |
-        echo "🧪 Running integration tests on new production environment..."
+        echo "Running integration tests on new production environment..."
         chmod +x .github/scripts/integration-tests.sh
         .github/scripts/integration-tests.sh production ${{ env.NEW_ENV }}
         
-    - name: 🔄 Switch Traffic (Blue-Green)
+    - name: Switch Traffic (Blue-Green)
       run: |
-        echo "🔄 Switching traffic to lugx-${{ env.NEW_ENV }}..."
+        echo "Switching traffic to lugx-${{ env.NEW_ENV }}..."
         
         # Update ingress to point to new environment
         kubectl patch ingress lugx-gaming-ingress -p '{"spec":{"rules":[{"host":"lugx-games.local","http":{"paths":[{"path":"/","pathType":"Prefix","backend":{"service":{"name":"frontend","port":{"number":80}}}}]}}]}}' -n lugx-${{ env.NEW_ENV }}
@@ -430,12 +430,12 @@ jobs:
         sleep 30
         
         # Final health check
-        echo "🏥 Final health check..."
+        echo "Final health check..."
         .github/scripts/health-check.sh ${{ env.NEW_ENV }}
         
-    - name: 🧹 Cleanup Old Environment
+    - name: Cleanup Old Environment
       run: |
-        echo "🧹 Cleaning up old environment: lugx-${{ env.CURRENT_ENV }}"
+        echo "Cleaning up old environment: lugx-${{ env.CURRENT_ENV }}"
         
         # Wait 5 minutes before cleanup (ensure traffic has switched)
         sleep 300
@@ -443,95 +443,95 @@ jobs:
         # Delete old environment (optional - can keep for rollback)
         # kubectl delete namespace lugx-${{ env.CURRENT_ENV }} --ignore-not-found=true
         
-        echo "✅ Blue-Green deployment completed successfully!"
+        echo "Blue-Green deployment completed successfully!"
 
-  # Job 5: Periodic Integration Tests (Reliability Monitoring)
+  # Job 6: Periodic Integration Tests (Reliability Monitoring)
   periodic-integration-tests:
-    name: 🔄 Periodic Integration Tests
+    name: Periodic Integration Tests
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Configure AWS Credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
         
-    - name: 🔧 Setup kubectl
+    - name: Setup kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'latest'
         
-    - name: 🎯 Connect to EKS Cluster
+    - name: Connect to EKS Cluster
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: 🧪 Run Periodic Reliability Tests
+    - name: Running Periodic Integration Tests
       run: |
-        echo "🔄 Running periodic integration tests for reliability monitoring..."
+        echo "Running periodic integration tests for reliability monitoring..."
         chmod +x .github/scripts/integration-tests.sh
         .github/scripts/periodic-tests.sh
         
-    - name: 📊 Generate Test Report
+    - name: Generate Test Report
       run: |
-        echo "📊 Generating reliability test report..."
+        echo "Generating reliability test report..."
         chmod +x .github/scripts/generate-report.sh
         .github/scripts/generate-report.sh
         
-    - name: 📤 Upload Test Results
+    - name: Upload Test Results
       uses: actions/upload-artifact@v3
       if: always()
       with:
         name: periodic-test-results
         path: test-results/
         
-    - name: 🚨 Log Test Failure
+    - name: Log Test Failure
       if: failure()
       run: |
-        echo "🚨 Periodic integration tests failed!"
+        echo "Periodic integration tests failed!"
         echo "Check the workflow logs and test results for details."
         echo "Failed at: $(date)"
 
-  # Job 6: Rollback on Failure
+  # Job 7: Rollback on Failure
   rollback:
-    name: 🔙 Rollback on Failure
+    name: Rollback on Failure
     runs-on: ubuntu-latest
     needs: [deploy-production]
     if: failure() && github.ref == 'refs/heads/main'
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Configure AWS Credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
         
-    - name: 🔧 Setup kubectl
+    - name: Setup kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'latest'
         
-    - name: 🎯 Connect to EKS Cluster
+    - name: Connect to EKS Cluster
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: 🔙 Execute Rollback
+    - name: Execute Rollback
       run: |
-        echo "🔙 Executing rollback to previous stable version..."
+        echo "Executing rollback to previous stable version..."
         chmod +x .github/scripts/rollback.sh
         .github/scripts/rollback.sh
         
-    - name: 🚨 Log Rollback Completion
+    - name: Log Rollback Completion
       run: |
-        echo "🔙 Production deployment failed. Rollback executed to previous stable version."
+        echo "Production deployment failed. Rollback executed to previous stable version."
         echo "Check the deployment logs for failure details."
         echo "Rollback completed at: $(date)"
