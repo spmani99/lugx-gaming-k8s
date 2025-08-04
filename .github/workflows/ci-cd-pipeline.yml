@@ -164,7 +164,7 @@ jobs:
           echo "Running frontend tests in build stage..."
           cd ${{ matrix.service }}
           npm install
-          npm test -- --coverage --watchAll=false --passWithNoTests
+          npm test
         elif [ "${{ matrix.service }}" != "frontend" ]; then
           docker run --rm ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest npm test
         fi
