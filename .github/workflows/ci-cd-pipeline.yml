@@ -212,131 +212,12 @@ jobs:
       run: |
         echo "Skipping security scan for ${{ matrix.service }} - no changes detected"
 
-  # Job 4: Deploy to Staging (Rolling Deployment)
-  deploy-staging:
-    name: Deploy to Staging (Rolling)
+  # Job 4: Deploy to Production (Rolling Deployment for 100% Uptime)
+  deploy-production:
+    name: Deploy to Production (Rolling)
     runs-on: ubuntu-latest
     needs: [build-and-test, security-scan]
     if: github.ref == 'refs/heads/develop'
-    environment: staging
-    
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-        
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-        
-    - name: Connect to EKS Cluster
-      run: |
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        
-    - name: Create Staging Namespace
-      run: |
-        kubectl create namespace lugx-staging --dry-run=client -o yaml | kubectl apply -f -
-        
-    - name: Rolling Deployment to Staging
-      run: |
-        echo "Starting rolling deployment to staging..."
-        
-        # Apply all Kubernetes manifests to staging namespace
-        echo "Applying Kubernetes manifests to staging..."
-        kubectl apply -f frontend/frontend-deployment.yaml -n lugx-staging
-        kubectl apply -f frontend/frontend-secret.yaml -n lugx-staging
-        kubectl apply -f game-service/game-service-deployment.yaml -n lugx-staging
-        kubectl apply -f game-service/game-db-secret.yaml -n lugx-staging
-        kubectl apply -f order-service/order-service-deployment.yaml -n lugx-staging
-        kubectl apply -f order-service/order-db-secret.yaml -n lugx-staging
-        kubectl apply -f analytics-service/analytics-service-deployment.yaml -n lugx-staging
-        kubectl apply -f analytics-service/analytics-secret.yaml -n lugx-staging
-        
-        # Create staging-specific ingress with different host
-        echo "Creating staging ingress..."
-        echo "apiVersion: networking.k8s.io/v1" > staging-ingress.yaml
-        echo "kind: Ingress" >> staging-ingress.yaml
-        echo "metadata:" >> staging-ingress.yaml
-        echo "  name: lugx-staging-ingress" >> staging-ingress.yaml
-        echo "  namespace: lugx-staging" >> staging-ingress.yaml
-        echo "  annotations:" >> staging-ingress.yaml
-        echo "    nginx.ingress.kubernetes.io/rewrite-target: /\\$2" >> staging-ingress.yaml
-        echo "    nginx.ingress.kubernetes.io/use-regex: \"true\"" >> staging-ingress.yaml
-        echo "spec:" >> staging-ingress.yaml
-        echo "  ingressClassName: nginx" >> staging-ingress.yaml
-        echo "  rules:" >> staging-ingress.yaml
-        echo "    - host: lugx-staging.local" >> staging-ingress.yaml
-        echo "      http:" >> staging-ingress.yaml
-        echo "        paths:" >> staging-ingress.yaml
-        echo "          - path: /()(.*)" >> staging-ingress.yaml
-        echo "            pathType: ImplementationSpecific" >> staging-ingress.yaml
-        echo "            backend:" >> staging-ingress.yaml
-        echo "              service:" >> staging-ingress.yaml
-        echo "                name: frontend" >> staging-ingress.yaml
-        echo "                port:" >> staging-ingress.yaml
-        echo "                  number: 80" >> staging-ingress.yaml
-        echo "          - path: /api/games(/|\\$)(.*)" >> staging-ingress.yaml
-        echo "            pathType: ImplementationSpecific" >> staging-ingress.yaml
-        echo "            backend:" >> staging-ingress.yaml
-        echo "              service:" >> staging-ingress.yaml
-        echo "                name: game-service" >> staging-ingress.yaml
-        echo "                port:" >> staging-ingress.yaml
-        echo "                  number: 3001" >> staging-ingress.yaml
-        echo "          - path: /api/orders(/|\\$)(.*)" >> staging-ingress.yaml
-        echo "            pathType: ImplementationSpecific" >> staging-ingress.yaml
-        echo "            backend:" >> staging-ingress.yaml
-        echo "              service:" >> staging-ingress.yaml
-        echo "                name: order-service" >> staging-ingress.yaml
-        echo "                port:" >> staging-ingress.yaml
-        echo "                  number: 3002" >> staging-ingress.yaml
-        echo "          - path: /api/analytics(/|\\$)(.*)" >> staging-ingress.yaml
-        echo "            pathType: ImplementationSpecific" >> staging-ingress.yaml
-        echo "            backend:" >> staging-ingress.yaml
-        echo "              service:" >> staging-ingress.yaml
-        echo "                name: analytics-service" >> staging-ingress.yaml
-        echo "                port:" >> staging-ingress.yaml
-        echo "                  number: 3003" >> staging-ingress.yaml
-        
-        kubectl apply -f staging-ingress.yaml
-        
-        # Update image tags in deployment files
-        services=("frontend" "game-service" "order-service" "analytics-service")
-        
-        for service in "${services[@]}"; do
-          echo "Deploying $service to staging..."
-          
-          # Update deployment with new image
-          kubectl set image deployment/${service}-deployment ${service}=${{ env.DOCKER_USERNAME }}/${service}:${{ github.sha }} -n lugx-staging
-          
-          # Wait for rollout to complete
-          kubectl rollout status deployment/${service}-deployment -n lugx-staging --timeout=1800s
-          
-          # Check deployment health
-          kubectl get pods -n lugx-staging -l app=${service}
-        done
-        
-        echo "Staging deployment completed!"
-        echo "Staging URL: http://lugx-staging.local"
-        
-    - name: Run Integration Tests - Staging
-      run: |
-        echo "Running integration tests on staging..."
-        chmod +x .github/scripts/integration-tests.sh
-        .github/scripts/integration-tests.sh staging
-
-  # Job 5: Deploy to Production (Blue-Green)
-  deploy-production:
-    name: Deploy to Production (Blue-Green)
-    runs-on: ubuntu-latest
-    needs: [deploy-staging]
-    if: github.ref == 'refs/heads/main'
     environment: production
     
     steps:
@@ -359,88 +240,51 @@ jobs:
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: Blue-Green Deployment Setup
+    - name: Rolling Deployment to Production (100% Uptime)
       run: |
-        echo "Setting up Blue-Green deployment..."
+        echo "Starting rolling deployment to production for 100% uptime..."
         
-        # Determine current active environment
-        if kubectl get namespace lugx-blue > /dev/null 2>&1; then
-          CURRENT_ENV="blue"
-          NEW_ENV="green" 
-        else
-          CURRENT_ENV="green"
-          NEW_ENV="blue"
-        fi
+        # Apply all Kubernetes manifests to default namespace
+        echo "Applying Kubernetes manifests with rolling update strategy..."
+        kubectl apply -f frontend/frontend-deployment.yaml
+        kubectl apply -f frontend/frontend-secret.yaml
+        kubectl apply -f game-service/game-service-deployment.yaml
+        kubectl apply -f game-service/game-db-secret.yaml
+        kubectl apply -f order-service/order-service-deployment.yaml
+        kubectl apply -f order-service/order-db-secret.yaml
+        kubectl apply -f analytics-service/analytics-service-deployment.yaml
+        kubectl apply -f analytics-service/analytics-secret.yaml
         
-        echo "Current active: lugx-$CURRENT_ENV"
-        echo "Deploying to: lugx-$NEW_ENV"
-        echo "CURRENT_ENV=$CURRENT_ENV" >> $GITHUB_ENV
-        echo "NEW_ENV=$NEW_ENV" >> $GITHUB_ENV
+        # Apply main ingress
+        echo "Applying main ingress..."
+        kubectl apply -f ingress.yaml
         
-    - name: Deploy to New Environment
-      run: |
-        echo "Deploying to lugx-${{ env.NEW_ENV }}..."
-        
-        # Create new environment namespace
-        kubectl create namespace lugx-${{ env.NEW_ENV }} --dry-run=client -o yaml | kubectl apply -f -
-        
-        # Apply secrets to new environment
-        kubectl apply -f frontend/frontend-secret.yaml -n lugx-${{ env.NEW_ENV }}
-        kubectl apply -f game-service/game-db-secret.yaml -n lugx-${{ env.NEW_ENV }}
-        kubectl apply -f order-service/order-db-secret.yaml -n lugx-${{ env.NEW_ENV }}
-        kubectl apply -f analytics-service/analytics-secret.yaml -n lugx-${{ env.NEW_ENV }}
-        
-        # Deploy services with updated images
+        # Update image tags in deployment files
         services=("frontend" "game-service" "order-service" "analytics-service")
         
         for service in "${services[@]}"; do
-          echo "Deploying $service to lugx-${{ env.NEW_ENV }}..."
+          echo "Deploying $service to production..."
           
-          # Create temporary deployment file with updated image and namespace
-          sed "s|image: spmani99/${service}:latest|image: spmani99/${service}:${{ github.sha }}|g" ${service}/${service}-deployment.yaml > temp-${service}-deployment.yaml
-          sed -i "s|namespace: default|namespace: lugx-${{ env.NEW_ENV }}|g" temp-${service}-deployment.yaml
+          # Update deployment with new image
+          kubectl set image deployment/${service}-deployment ${service}=${{ env.DOCKER_USERNAME }}/${service}:${{ github.sha }}
           
-          kubectl apply -f temp-${service}-deployment.yaml
+          # Wait for rollout to complete
+          kubectl rollout status deployment/${service}-deployment --timeout=900s
           
-          # Wait for deployment to be ready
-          kubectl rollout status deployment/${service}-deployment -n lugx-${{ env.NEW_ENV }} --timeout=600s
-          
-          rm temp-${service}-deployment.yaml
+          # Check deployment health
+          kubectl get pods -l app=${service}
         done
+        
+        echo "Production deployment completed!"
+        echo "Production URL: http://lugx-games.local"
         
     - name: Run Integration Tests - Production
       run: |
-        echo "Running integration tests on new production environment..."
+        echo "Running integration tests on production..."
         chmod +x .github/scripts/integration-tests.sh
-        .github/scripts/integration-tests.sh production ${{ env.NEW_ENV }}
-        
-    - name: Switch Traffic (Blue-Green)
-      run: |
-        echo "Switching traffic to lugx-${{ env.NEW_ENV }}..."
-        
-        # Update ingress to point to new environment
-        kubectl patch ingress lugx-gaming-ingress -p '{"spec":{"rules":[{"host":"lugx-games.local","http":{"paths":[{"path":"/","pathType":"Prefix","backend":{"service":{"name":"frontend","port":{"number":80}}}}]}}]}}' -n lugx-${{ env.NEW_ENV }}
-        
-        # Wait for ingress update
-        sleep 30
-        
-        # Final health check
-        echo "Final health check..."
-        .github/scripts/health-check.sh ${{ env.NEW_ENV }}
-        
-    - name: Cleanup Old Environment
-      run: |
-        echo "Cleaning up old environment: lugx-${{ env.CURRENT_ENV }}"
-        
-        # Wait 5 minutes before cleanup (ensure traffic has switched)
-        sleep 300
-        
-        # Delete old environment (optional - can keep for rollback)
-        # kubectl delete namespace lugx-${{ env.CURRENT_ENV }} --ignore-not-found=true
-        
-        echo "Blue-Green deployment completed successfully!"
+        .github/scripts/integration-tests.sh production
 
-  # Job 6: Periodic Integration Tests (Reliability Monitoring)
+  # Job 5: Periodic Integration Tests (Reliability Monitoring)
   periodic-integration-tests:
     name: Periodic Integration Tests
     runs-on: ubuntu-latest
