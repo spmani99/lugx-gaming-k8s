@@ -4,6 +4,11 @@ metadata:
   name: order-service-deployment
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: order
@@ -28,12 +33,12 @@ spec:
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: orderdb-secret
+                  name: order-db-secret
                   key: root_username
             - name: DB_PASS
               valueFrom:
                 secretKeyRef:
-                  name: orderdb-secret
+                  name: order-db-secret
                   key: root_password
             - name: API_KEY
               value: "lgx_admin_z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4"

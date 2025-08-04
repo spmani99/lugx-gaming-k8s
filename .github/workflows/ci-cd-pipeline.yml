@@ -1,8 +1,8 @@
-name: 🎮 Lugx Gaming CI/CD Pipeline
+name: Lugx Gaming CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   schedule:
@@ -16,14 +16,95 @@ env:
   EKS_CLUSTER_NAME: lugx-gaming-cluster
   
 jobs:
-  # Job 1: Build and Test
-  build-and-test:
-    name: 🔨 Build & Test Services
+  # Job 1: Detect Changed Services
+  detect-changes:
+    name: Detect Changed Services
     runs-on: ubuntu-latest
+    outputs:
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      game-service-changed: ${{ steps.changes.outputs.game-service }}
+      order-service-changed: ${{ steps.changes.outputs.order-service }}
+      analytics-service-changed: ${{ steps.changes.outputs.analytics-service }}
+      any-changes: ${{ steps.changes.outputs.any }}
+      
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Get full history for change detection
+        
+    - name: Detect Service Changes
+      id: changes
+      run: |
+        echo "Detecting which services have changed..."
+        
+        # Get list of changed files
+        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+        
+        echo "Changed files:"
+        echo "$CHANGED_FILES"
+        
+        # Check which services have changes
+        FRONTEND_CHANGED=false
+        GAME_SERVICE_CHANGED=false
+        ORDER_SERVICE_CHANGED=false
+        ANALYTICS_SERVICE_CHANGED=false
+        
+        if echo "$CHANGED_FILES" | grep -q "^frontend/"; then
+          FRONTEND_CHANGED=true
+          echo "Frontend has changes"
+        fi
+        
+        if echo "$CHANGED_FILES" | grep -q "^game-service/"; then
+          GAME_SERVICE_CHANGED=true
+          echo "Game Service has changes"
+        fi
+        
+        if echo "$CHANGED_FILES" | grep -q "^order-service/"; then
+          ORDER_SERVICE_CHANGED=true
+          echo "Order Service has changes"
+        fi
+        
+        if echo "$CHANGED_FILES" | grep -q "^analytics-service/"; then
+          ANALYTICS_SERVICE_CHANGED=true
+          echo "Analytics Service has changes"
+        fi
+        
+        # For scheduled runs or if no specific changes detected, build all
+        if [ "${{ github.event_name }}" = "schedule" ] || [ -z "$CHANGED_FILES" ]; then
+          FRONTEND_CHANGED=true
+          GAME_SERVICE_CHANGED=true
+          ORDER_SERVICE_CHANGED=true
+          ANALYTICS_SERVICE_CHANGED=true
+          echo "Scheduled run or no changes detected - building all services"
+        fi
+        
+        # Set outputs
+        echo "frontend=$FRONTEND_CHANGED" >> $GITHUB_OUTPUT
+        echo "game-service=$GAME_SERVICE_CHANGED" >> $GITHUB_OUTPUT
+        echo "order-service=$ORDER_SERVICE_CHANGED" >> $GITHUB_OUTPUT
+        echo "analytics-service=$ANALYTICS_SERVICE_CHANGED" >> $GITHUB_OUTPUT
+        echo "any=true" >> $GITHUB_OUTPUT
+
+  # Job 2: Build and Test (Selective)
+  build-and-test:
+    name: Build & Test Services
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any-changes == 'true'
     
     strategy:
       matrix:
         service: [frontend, game-service, order-service, analytics-service]
+        include:
+          - service: frontend
+            should-build: ${{ needs.detect-changes.outputs.frontend-changed }}
+          - service: game-service
+            should-build: ${{ needs.detect-changes.outputs.game-service-changed }}
+          - service: order-service
+            should-build: ${{ needs.detect-changes.outputs.order-service-changed }}
+          - service: analytics-service
+            should-build: ${{ needs.detect-changes.outputs.analytics-service-changed }}
         
     outputs:
       frontend-image: ${{ steps.meta.outputs.tags }}
@@ -32,19 +113,19 @@ jobs:
       analytics-service-image: ${{ steps.meta.outputs.tags }}
       
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: 🐳 Set up Docker Buildx
+    - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
-    - name: 🔑 Login to Docker Hub
+    - name: Login to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ env.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         
-    - name: 📋 Extract Metadata
+    - name: Extract Metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
@@ -55,7 +136,8 @@ jobs:
           type=sha,prefix={{branch}}-
           type=raw,value=latest,enable={{is_default_branch}}
           
-    - name: 🔨 Build and Push Docker Image
+    - name: Build and Push Docker Image
+      if: matrix.should-build == 'true'
       uses: docker/build-push-action@v5
       with:
         context: ./${{ matrix.service }}
@@ -66,127 +148,138 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         
-    - name: 🧪 Run Unit Tests
+    - name: Skip Build (No Changes)
+      if: matrix.should-build != 'true'
       run: |
-        echo "🧪 Running unit tests for ${{ matrix.service }}"
-        # Add unit test commands here based on service type
-        if [ "${{ matrix.service }}" = "frontend" ]; then
-          docker run --rm ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest npm test -- --coverage --watchAll=false
-        elif [ "${{ matrix.service }}" != "frontend" ]; then
-          docker run --rm ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest npm test
-        fi
+        echo "Skipping build for ${{ matrix.service }} - no changes detected"
+        echo "Using existing image: ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest"
+        
+    - name: Run Unit Tests
+      if: matrix.should-build == 'true'
+      run: |
+        echo "Running unit tests for ${{ matrix.service }}"
+        # Run tests on source code for all services
+        cd ${{ matrix.service }}
+        npm install
+        npm test
+        
+    - name: Skip Tests (No Changes)
+      if: matrix.should-build != 'true'
+      run: |
+        echo "Skipping tests for ${{ matrix.service }} - no changes detected"
 
-  # Job 2: Security Scanning
+  # Job 3: Security Scanning (Selective)
   security-scan:
-    name: 🔒 Security Scanning
+    name: Security Scanning
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [detect-changes, build-and-test]
+    if: needs.detect-changes.outputs.any-changes == 'true'
     
     strategy:
       matrix:
         service: [frontend, game-service, order-service, analytics-service]
+        include:
+          - service: frontend
+            should-scan: ${{ needs.detect-changes.outputs.frontend-changed }}
+          - service: game-service
+            should-scan: ${{ needs.detect-changes.outputs.game-service-changed }}
+          - service: order-service
+            should-scan: ${{ needs.detect-changes.outputs.order-service-changed }}
+          - service: analytics-service
+            should-scan: ${{ needs.detect-changes.outputs.analytics-service-changed }}
         
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: 🔍 Run Trivy Vulnerability Scanner
+    - name: Run Trivy Vulnerability Scanner
+      if: matrix.should-scan == 'true'
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest
         format: 'sarif'
         output: 'trivy-results.sarif'
         
-    - name: 📤 Upload Trivy Scan Results
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
+    - name: Upload Trivy Scan Results
+      if: matrix.should-scan == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      continue-on-error: true
       with:
         sarif_file: 'trivy-results.sarif'
+        
+    - name: Skip Security Scan (No Changes)
+      if: matrix.should-scan != 'true'
+      run: |
+        echo "Skipping security scan for ${{ matrix.service }} - no changes detected"
 
-  # Job 3: Deploy to Staging (Rolling Deployment)
-  deploy-staging:
-    name: 🚀 Deploy to Staging (Rolling)
+  # Job 4: Deploy to Production (Rolling Deployment for 100% Uptime)
+  deploy-production:
+    name: Deploy to Production (Rolling)
     runs-on: ubuntu-latest
     needs: [build-and-test, security-scan]
-    if: github.ref == 'refs/heads/develop'
-    environment: staging
+    if: github.ref == 'refs/heads/main'
+    environment: production
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Configure AWS Credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
         
-    - name: 🔧 Setup kubectl
+    - name: Setup kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'latest'
         
-    - name: 🎯 Connect to EKS Cluster
+    - name: Connect to EKS Cluster
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: 🏷️ Create Staging Namespace
+    - name: Rolling Deployment to Production (100% Uptime)
       run: |
-        kubectl create namespace lugx-staging --dry-run=client -o yaml | kubectl apply -f -
+        echo "Starting rolling deployment to production for 100% uptime..."
         
-    - name: 🔄 Rolling Deployment to Staging
-      run: |
-        echo "🚀 Starting rolling deployment to staging..."
+        # Apply all Kubernetes manifests to default namespace
+        echo "Applying Kubernetes manifests with rolling update strategy..."
+        kubectl apply -f frontend/frontend-deployment.yaml
+        kubectl apply -f frontend/frontend-secret.yaml
+        kubectl apply -f game-service/game-service-deployment.yaml
+        kubectl apply -f game-service/game-db-secret.yaml
+        kubectl apply -f order-service/order-service-deployment.yaml
+        kubectl apply -f order-service/order-db-secret.yaml
+        kubectl apply -f analytics-service/analytics-service-deployment.yaml
+        kubectl apply -f analytics-service/analytics-secret.yaml
+        
+        # Apply main ingress
+        echo "Applying main ingress..."
+        kubectl apply -f ingress.yaml
         
         # Update image tags in deployment files
         services=("frontend" "game-service" "order-service" "analytics-service")
         
         for service in "${services[@]}"; do
-          echo "📦 Deploying $service to staging..."
+          echo "Deploying $service to production..."
           
           # Update deployment with new image
-          kubectl set image deployment/${service}-deployment ${service}=${{ env.DOCKER_USERNAME }}/${service}:${{ github.sha }} -n lugx-staging
+          kubectl set image deployment/${service}-deployment ${service}=${{ env.DOCKER_USERNAME }}/${service}:${{ github.sha }}
           
           # Force rollout without waiting for graceful termination
           kubectl rollout status deployment/${service}-deployment -n lugx-staging --timeout=60s || true
           kubectl delete pods -l app=${service} -n lugx-staging --force --grace-period=0 || true
           
           # Check deployment health
-          kubectl get pods -n lugx-staging -l app=${service}
+          kubectl get pods -l app=${service}
         done
         
-    - name: 🧪 Run Integration Tests - Staging
-      run: |
-        echo "🧪 Running integration tests on staging..."
-        chmod +x .github/scripts/integration-tests.sh
-        .github/scripts/integration-tests.sh staging
-
-  # Job 4: Deploy to Production (Blue-Green)
-  deploy-production:
-    name: 🎯 Deploy to Production (Blue-Green)
-    runs-on: ubuntu-latest
-    needs: [deploy-staging]
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: ⚙️ Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+        echo "Production deployment completed!"
+        echo "Production URL: http://lugx-games.local"
         
-    - name: 🔧 Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-        
-    - name: 🎯 Connect to EKS Cluster
+    - name: Run Integration Tests - Production
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
@@ -244,127 +337,95 @@ jobs:
       run: |
         echo "🧪 Running integration tests on new production environment..."
         chmod +x .github/scripts/integration-tests.sh
-        .github/scripts/integration-tests.sh production ${{ env.NEW_ENV }}
-        
-    - name: 🔄 Switch Traffic (Blue-Green)
-      run: |
-        echo "🔄 Switching traffic to lugx-${{ env.NEW_ENV }}..."
-        
-        # Update ingress to point to new environment
-        kubectl patch ingress lugx-gaming-ingress -p '{"spec":{"rules":[{"host":"lugx-games.local","http":{"paths":[{"path":"/","pathType":"Prefix","backend":{"service":{"name":"frontend","port":{"number":80}}}}]}}]}}' -n lugx-${{ env.NEW_ENV }}
-        
-        # Wait for ingress update
-        sleep 30
-        
-        # Final health check
-        echo "🏥 Final health check..."
-        .github/scripts/health-check.sh ${{ env.NEW_ENV }}
-        
-    - name: 🧹 Cleanup Old Environment
-      run: |
-        echo "🧹 Cleaning up old environment: lugx-${{ env.CURRENT_ENV }}"
-        
-        # Wait 5 minutes before cleanup (ensure traffic has switched)
-        sleep 300
-        
-        # Delete old environment (optional - can keep for rollback)
-        # kubectl delete namespace lugx-${{ env.CURRENT_ENV }} --ignore-not-found=true
-        
-        echo "✅ Blue-Green deployment completed successfully!"
+        .github/scripts/integration-tests.sh production
 
   # Job 5: Periodic Integration Tests (Reliability Monitoring)
   periodic-integration-tests:
-    name: 🔄 Periodic Integration Tests
+    name: Periodic Integration Tests
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Configure AWS Credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
         
-    - name: 🔧 Setup kubectl
+    - name: Setup kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'latest'
         
-    - name: 🎯 Connect to EKS Cluster
+    - name: Connect to EKS Cluster
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: 🧪 Run Periodic Reliability Tests
+    - name: Running Periodic Integration Tests
       run: |
-        echo "🔄 Running periodic integration tests for reliability monitoring..."
+        echo "Running periodic integration tests for reliability monitoring..."
         chmod +x .github/scripts/integration-tests.sh
         .github/scripts/periodic-tests.sh
         
-    - name: 📊 Generate Test Report
+    - name: Generate Test Report
       run: |
-        echo "📊 Generating reliability test report..."
+        echo "Generating reliability test report..."
         chmod +x .github/scripts/generate-report.sh
         .github/scripts/generate-report.sh
         
-    - name: 📤 Upload Test Results
+    - name: Upload Test Results
       uses: actions/upload-artifact@v3
       if: always()
       with:
         name: periodic-test-results
         path: test-results/
         
-    - name: 🚨 Notify on Failure
+    - name: Log Test Failure
       if: failure()
-      uses: 8398a7/action-slack@v3
-      with:
-        status: failure
-        channel: '#lugx-gaming-alerts'
-        message: '🚨 Periodic integration tests failed! Check the logs for details.'
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        echo "Periodic integration tests failed!"
+        echo "Check the workflow logs and test results for details."
+        echo "Failed at: $(date)"
 
-  # Job 6: Rollback on Failure
+  # Job 7: Rollback on Failure
   rollback:
-    name: 🔙 Rollback on Failure
+    name: Rollback on Failure
     runs-on: ubuntu-latest
     needs: [deploy-production]
     if: failure() && github.ref == 'refs/heads/main'
     
     steps:
-    - name: 📥 Checkout Code
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: ⚙️ Configure AWS Credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
         
-    - name: 🔧 Setup kubectl
+    - name: Setup kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'latest'
         
-    - name: 🎯 Connect to EKS Cluster
+    - name: Connect to EKS Cluster
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         
-    - name: 🔙 Execute Rollback
+    - name: Execute Rollback
       run: |
-        echo "🔙 Executing rollback to previous stable version..."
+        echo "Executing rollback to previous stable version..."
         chmod +x .github/scripts/rollback.sh
         .github/scripts/rollback.sh
         
-    - name: 🚨 Notify Rollback
-      uses: 8398a7/action-slack@v3
-      with:
-        status: failure
-        channel: '#lugx-gaming-alerts'
-        message: '🔙 Production deployment failed. Rollback executed to previous stable version.'
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    - name: Log Rollback Completion
+      run: |
+        echo "Production deployment failed. Rollback executed to previous stable version."
+        echo "Check the deployment logs for failure details."
+        echo "Rollback completed at: $(date)"

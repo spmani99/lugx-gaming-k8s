@@ -4,6 +4,11 @@ metadata:
   name: game-service-deployment
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: game
@@ -22,12 +27,12 @@ spec:
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: gamedb-secret
+                  name: game-db-secret
                   key: root_username
             - name: DB_PASS
               valueFrom:
                 secretKeyRef:
-                  name: gamedb-secret
+                  name: game-db-secret
                   key: root_password
             - name: DB_HOST
               value: "lugx-games-mysql.ca1uo2uoa8cu.us-east-1.rds.amazonaws.com"
