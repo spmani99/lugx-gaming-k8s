@@ -321,7 +321,7 @@ jobs:
           kubectl set image deployment/${service}-deployment ${service}=${{ env.DOCKER_USERNAME }}/${service}:${{ github.sha }} -n lugx-staging
           
           # Wait for rollout to complete
-          kubectl rollout status deployment/${service}-deployment -n lugx-staging --timeout=300s
+          kubectl rollout status deployment/${service}-deployment -n lugx-staging --timeout=600s
           
           # Check deployment health
           kubectl get pods -n lugx-staging -l app=${service}
