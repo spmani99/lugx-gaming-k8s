@@ -249,6 +249,18 @@ jobs:
       run: |
         echo "🚀 Starting rolling deployment to staging..."
         
+        # Apply all Kubernetes manifests to staging namespace
+        echo "📋 Applying Kubernetes manifests to staging..."
+        kubectl apply -f frontend/frontend-deployment.yaml -n lugx-staging
+        kubectl apply -f frontend/frontend-secret.yaml -n lugx-staging
+        kubectl apply -f game-service/game-service-deployment.yaml -n lugx-staging
+        kubectl apply -f game-service/game-db-secret.yaml -n lugx-staging
+        kubectl apply -f order-service/order-service-deployment.yaml -n lugx-staging
+        kubectl apply -f order-service/order-db-secret.yaml -n lugx-staging
+        kubectl apply -f analytics-service/analytics-service-deployment.yaml -n lugx-staging
+        kubectl apply -f analytics-service/analytics-secret.yaml -n lugx-staging
+        kubectl apply -f ingress.yaml -n lugx-staging
+        
         # Update image tags in deployment files
         services=("frontend" "game-service" "order-service" "analytics-service")
         
