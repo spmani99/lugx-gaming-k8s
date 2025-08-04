@@ -23,6 +23,11 @@
     "test": "react-scripts test --passWithNoTests",
     "eject": "react-scripts eject"
   },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(axios|recharts|date-fns)/)"
+    ]
+  },
   "eslintConfig": {
     "extends": [
       "react-app",
