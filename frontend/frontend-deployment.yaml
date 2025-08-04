@@ -1,9 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: frontend-deployment
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: frontend
@@ -12,24 +17,15 @@ spec:
       labels:
         app: frontend
     spec:
+      terminationGracePeriodSeconds: 10
       containers:
       - name: frontend
         image: spmani99/frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
-        env:
-        - name: REACT_APP_ANALYTICS_API
-          value: "/api/analytics"
-        - name: REACT_APP_GAME_API
-          value: "/api/games"
-        - name: REACT_APP_ORDER_API
-          value: "/api/orders"
-        - name: REACT_APP_ADMIN_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: frontend-secret
-              key: admin_api_key
+        # Minimal configuration to test deployment speed
+
 
 ---
 apiVersion: v1
