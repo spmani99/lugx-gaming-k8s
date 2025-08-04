@@ -158,16 +158,10 @@ jobs:
       if: matrix.should-build == 'true'
       run: |
         echo "Running unit tests for ${{ matrix.service }}"
-        # Add unit test commands here based on service type
-        if [ "${{ matrix.service }}" = "frontend" ]; then
-          # For frontend, run tests in the build stage since final image is nginx
-          echo "Running frontend tests in build stage..."
-          cd ${{ matrix.service }}
-          npm install
-          npm test
-        elif [ "${{ matrix.service }}" != "frontend" ]; then
-          docker run --rm ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest npm test
-        fi
+        # Run tests on source code for all services
+        cd ${{ matrix.service }}
+        npm install
+        npm test
         
     - name: Skip Tests (No Changes)
       if: matrix.should-build != 'true'
