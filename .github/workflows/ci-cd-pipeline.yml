@@ -315,15 +315,12 @@ jobs:
         name: periodic-test-results
         path: test-results/
         
-    - name: 🚨 Notify on Failure
+    - name: 🚨 Log Test Failure
       if: failure()
-      uses: 8398a7/action-slack@v3
-      with:
-        status: failure
-        channel: '#lugx-gaming-alerts'
-        message: '🚨 Periodic integration tests failed! Check the logs for details.'
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        echo "🚨 Periodic integration tests failed!"
+        echo "Check the workflow logs and test results for details."
+        echo "Failed at: $(date)"
 
   # Job 6: Rollback on Failure
   rollback:
@@ -358,11 +355,8 @@ jobs:
         chmod +x .github/scripts/rollback.sh
         .github/scripts/rollback.sh
         
-    - name: 🚨 Notify Rollback
-      uses: 8398a7/action-slack@v3
-      with:
-        status: failure
-        channel: '#lugx-gaming-alerts'
-        message: '🔙 Production deployment failed. Rollback executed to previous stable version.'
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    - name: 🚨 Log Rollback Completion
+      run: |
+        echo "🔙 Production deployment failed. Rollback executed to previous stable version."
+        echo "Check the deployment logs for failure details."
+        echo "Rollback completed at: $(date)"
