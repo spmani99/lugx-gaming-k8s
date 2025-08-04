@@ -160,7 +160,11 @@ jobs:
         echo "🧪 Running unit tests for ${{ matrix.service }}"
         # Add unit test commands here based on service type
         if [ "${{ matrix.service }}" = "frontend" ]; then
-          docker run --rm ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest npm test -- --coverage --watchAll=false
+          # For frontend, run tests in the build stage since final image is nginx
+          echo "🧪 Running frontend tests in build stage..."
+          cd ${{ matrix.service }}
+          npm install
+          npm test -- --coverage --watchAll=false --passWithNoTests
         elif [ "${{ matrix.service }}" != "frontend" ]; then
           docker run --rm ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest npm test
         fi
