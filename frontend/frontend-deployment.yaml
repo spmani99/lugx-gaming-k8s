@@ -1,9 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: frontend-deployment
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  progressDeadlineSeconds: 300
   selector:
     matchLabels:
       app: frontend
@@ -12,6 +18,7 @@ spec:
       labels:
         app: frontend
     spec:
+      terminationGracePeriodSeconds: 5
       containers:
       - name: frontend
         image: spmani99/frontend:latest

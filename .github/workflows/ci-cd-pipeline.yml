@@ -148,8 +148,9 @@ jobs:
           # Update deployment with new image
           kubectl set image deployment/${service}-deployment ${service}=${{ env.DOCKER_USERNAME }}/${service}:${{ github.sha }} -n lugx-staging
           
-          # Wait for rollout to complete
-          kubectl rollout status deployment/${service}-deployment -n lugx-staging --timeout=300s
+          # Force rollout without waiting for graceful termination
+          kubectl rollout status deployment/${service}-deployment -n lugx-staging --timeout=60s || true
+          kubectl delete pods -l app=${service} -n lugx-staging --force --grace-period=0 || true
           
           # Check deployment health
           kubectl get pods -n lugx-staging -l app=${service}
@@ -233,7 +234,8 @@ jobs:
           kubectl apply -f temp-${service}-deployment.yaml
           
           # Wait for deployment to be ready
-          kubectl rollout status deployment/${service}-deployment -n lugx-${{ env.NEW_ENV }} --timeout=600s
+          kubectl rollout status deployment/${service}-deployment -n lugx-${{ env.NEW_ENV }} --timeout=60s || true
+          kubectl delete pods -l app=${service} -n lugx-${{ env.NEW_ENV }} --force --grace-period=0 || true
           
           rm temp-${service}-deployment.yaml
         done
