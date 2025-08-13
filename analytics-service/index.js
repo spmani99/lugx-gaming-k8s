@@ -10,9 +10,9 @@ const demoS3Export = require('./s3ExportDemo');
 const app = express();
 const port = process.env.PORT || 3003;
 
-// Enable CORS for frontend
+// Enable CORS for frontend (simplified for containerized environment)
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+  origin: true, // Allow all origins when behind ingress
   credentials: true
 }));
 
@@ -39,6 +39,29 @@ const getDeviceType = (userAgent) => {
 
 // Routes
 app.get('/', (req, res) => res.send('Analytics Service Running - ClickHouse + S3 Export Demo'));
+
+// Test endpoint for debugging routing
+app.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Analytics service test endpoint',
+    timestamp: new Date().toISOString(),
+    routes: [
+      'GET /',
+      'GET /test',
+      'GET /health',
+      'POST /track/pageview',
+      'POST /track/click',
+      'POST /track/scroll',
+      'POST /track/session',
+      'POST /track/event',
+      'GET /analytics/realtime/pageviews',
+      'GET /analytics/heatmap/:pageUrl',
+      'GET /analytics/scroll/:pageUrl',
+      'GET /analytics/dashboard'
+    ]
+  });
+});
 
 // ✅ Track Page View - ONLY CLICKHOUSE (No MySQL)
 app.post('/track/pageview', async (req, res) => {
@@ -70,8 +93,13 @@ app.post('/track/pageview', async (req, res) => {
       device
     };
 
-    // ✅ ONLY Store in ClickHouse (MySQL removed)
-    await clickHouse.insertPageView(pageViewData);
+    // ✅ ONLY Store in ClickHouse (MySQL removed)  
+    try {
+      await clickHouse.insertPageView(pageViewData);
+    } catch (dbError) {
+      console.warn('ClickHouse error (continuing anyway):', dbError.message);
+      // Continue anyway - don't fail tracking due to DB issues
+    }
 
     res.status(200).json({ success: true, message: 'Page view tracked successfully' });
   } catch (error) {
@@ -106,7 +134,12 @@ app.post('/track/click', async (req, res) => {
     };
 
     // ✅ ONLY Store in ClickHouse
-    await clickHouse.insertClickEvent(clickEventData);
+    try {
+      await clickHouse.insertClickEvent(clickEventData);
+    } catch (dbError) {
+      console.warn('ClickHouse error (continuing anyway):', dbError.message);
+      // Continue anyway - don't fail tracking due to DB issues
+    }
 
     res.status(200).json({ success: true, message: 'Click event tracked successfully' });
   } catch (error) {

@@ -27,7 +27,7 @@ spec:
         - containerPort: 80
         env:
         - name: REACT_APP_ANALYTICS_API
-          value: "http://k8s-ingressn-ingressn-d107d203ff-79c15f38f951b39b.elb.us-east-1.amazonaws.com/api/analytics"
+          value: "/api/analytics"
 
 ---
 apiVersion: v1
