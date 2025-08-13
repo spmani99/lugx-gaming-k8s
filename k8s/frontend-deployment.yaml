@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend-deployment
-  name: frontend-deployment
 spec:
   replicas: 1
   strategy:
