@@ -1,692 +1,81 @@
-name: Lugx Gaming - Comprehensive CI/CD Pipeline
+name: 🚀 Simple CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
-  schedule:
-    # Security scans every Monday at 2 AM
-    - cron: '0 2 * * 1'
-    # Health checks every 15 minutes
-    - cron: '*/15 * * * *'
-  workflow_dispatch:
-    inputs:
-      deployment_name:
-        description: 'Which deployment to rollback'
-        required: true
-        default: 'frontend-deployment'
-        type: choice
-        options:
-          - frontend-deployment
-          - game-service-deployment
-          - order-service-deployment
-          - analytics-service-deployment
-      rollback_revision:
-        description: 'Which revision to rollback to (leave empty for previous)'
-        required: false
-        default: ''
+    branches: [ main ]
 
 env:
-  DOCKER_REGISTRY: docker.io
   DOCKER_USERNAME: spmani99
   AWS_REGION: us-east-1
   EKS_CLUSTER_NAME: lugx-gaming-cluster
 
 jobs:
-  # 🔍 Job 1: Detect Changed Services & Workflow Type
-  detect-changes:
-    name: 🔍 Detect Changes & Workflow Type
+  # 🧪 Test
+  test:
+    name: 🧪 Run Tests
     runs-on: ubuntu-latest
-    outputs:
-      frontend-changed: ${{ steps.changes.outputs.frontend }}
-      game-service-changed: ${{ steps.changes.outputs.game-service }}
-      order-service-changed: ${{ steps.changes.outputs.order-service }}
-      analytics-service-changed: ${{ steps.changes.outputs.analytics-service }}
-      any-changes: ${{ steps.changes.outputs.any }}
-      is-security-scan: ${{ steps.workflow-type.outputs.is-security-scan }}
-      is-health-check: ${{ steps.workflow-type.outputs.is-health-check }}
-      is-rollback: ${{ steps.workflow-type.outputs.is-rollback }}
-      
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: 🔍 Determine Workflow Type
-      id: workflow-type
-      run: |
-        IS_SECURITY_SCAN=false
-        IS_HEALTH_CHECK=false
-        IS_ROLLBACK=false
-        
-        if [ "${{ github.event_name }}" = "schedule" ]; then
-          if [ "${{ github.event.schedule }}" = "0 2 * * 1" ]; then
-            IS_SECURITY_SCAN=true
-            echo "🔒 Security scan workflow triggered"
-          elif [ "${{ github.event.schedule }}" = "*/15 * * * *" ]; then
-            IS_HEALTH_CHECK=true
-            echo "🏥 Health check workflow triggered"
-          fi
-        elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          IS_ROLLBACK=true
-          echo "🔄 Manual rollback workflow triggered"
-        fi
-        
-        echo "is-security-scan=$IS_SECURITY_SCAN" >> $GITHUB_OUTPUT
-        echo "is-health-check=$IS_HEALTH_CHECK" >> $GITHUB_OUTPUT
-        echo "is-rollback=$IS_ROLLBACK" >> $GITHUB_OUTPUT
-        
-    - name: 🔍 Detect Service Changes
-      id: changes
-      run: |
-        echo "🔍 Detecting which services have changed..."
-        
-        # For special workflows, handle differently
-        if [ "${{ steps.workflow-type.outputs.is-security-scan }}" = "true" ] || [ "${{ steps.workflow-type.outputs.is-health-check }}" = "true" ]; then
-          echo "📊 Special workflow - checking all services"
-          FRONTEND_CHANGED=true
-          GAME_SERVICE_CHANGED=true
-          ORDER_SERVICE_CHANGED=true
-          ANALYTICS_SERVICE_CHANGED=true
-        elif [ "${{ steps.workflow-type.outputs.is-rollback }}" = "true" ]; then
-          echo "🔄 Rollback workflow - no service changes to detect"
-          FRONTEND_CHANGED=false
-          GAME_SERVICE_CHANGED=false
-          ORDER_SERVICE_CHANGED=false
-          ANALYTICS_SERVICE_CHANGED=false
-        else
-          # Get changed files from git diff
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
-          
-          echo "📁 Changed files:"
-          echo "$CHANGED_FILES"
-          
-          # Check which services have changes
-          FRONTEND_CHANGED=false
-          GAME_SERVICE_CHANGED=false
-          ORDER_SERVICE_CHANGED=false
-          ANALYTICS_SERVICE_CHANGED=false
-          
-          if echo "$CHANGED_FILES" | grep -q "^frontend/\|^\.github/\|^k8s/"; then
-            FRONTEND_CHANGED=true
-          fi
-          
-          if echo "$CHANGED_FILES" | grep -q "^game-service/\|^\.github/\|^k8s/"; then
-            GAME_SERVICE_CHANGED=true
-          fi
-          
-          if echo "$CHANGED_FILES" | grep -q "^order-service/\|^\.github/\|^k8s/"; then
-            ORDER_SERVICE_CHANGED=true
-          fi
-          
-          if echo "$CHANGED_FILES" | grep -q "^analytics-service/\|^\.github/\|^k8s/"; then
-            ANALYTICS_SERVICE_CHANGED=true
-          fi
-        fi
-        
-        # Check if any service changed
-        ANY_CHANGED=false
-        if [ "$FRONTEND_CHANGED" = "true" ] || [ "$GAME_SERVICE_CHANGED" = "true" ] || [ "$ORDER_SERVICE_CHANGED" = "true" ] || [ "$ANALYTICS_SERVICE_CHANGED" = "true" ]; then
-          ANY_CHANGED=true
-        fi
-        
-        # Set outputs
-        echo "frontend=$FRONTEND_CHANGED" >> $GITHUB_OUTPUT
-        echo "game-service=$GAME_SERVICE_CHANGED" >> $GITHUB_OUTPUT
-        echo "order-service=$ORDER_SERVICE_CHANGED" >> $GITHUB_OUTPUT
-        echo "analytics-service=$ANALYTICS_SERVICE_CHANGED" >> $GITHUB_OUTPUT
-        echo "any=$ANY_CHANGED" >> $GITHUB_OUTPUT
-        
-        echo "📊 Detection results:"
-        echo "  Frontend changed: $FRONTEND_CHANGED"
-        echo "  Game Service changed: $GAME_SERVICE_CHANGED"
-        echo "  Order Service changed: $ORDER_SERVICE_CHANGED"
-        echo "  Analytics Service changed: $ANALYTICS_SERVICE_CHANGED"
-        echo "  Any changes: $ANY_CHANGED"
-
-  # 🧪 Job 2: Comprehensive Testing Workflow
-  test-suite:
-    name: 🧪 Run Test Suite
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.any-changes == 'true' && needs.detect-changes.outputs.is-rollback != 'true' && needs.detect-changes.outputs.is-health-check != 'true'
     strategy:
       matrix:
         service: [frontend, game-service, order-service]
     
     steps:
-    - name: 📥 Checkout Code
+    - name: 📥 Checkout
       uses: actions/checkout@v4
       
-    - name: 🔧 Setup Node.js 18
+    - name: 🔧 Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
         cache-dependency-path: ${{ matrix.service }}/package-lock.json
         
-    - name: 📦 Install Dependencies
+    - name: 📦 Install & Test
       run: |
-        echo "📦 Installing dependencies for ${{ matrix.service }}"
         cd ${{ matrix.service }}
-        npm ci
-        
-    - name: 🔍 Lint Code
-      run: |
-        echo "🔍 Running linting for ${{ matrix.service }}"
-        cd ${{ matrix.service }}
-        # Create simple eslint config if it doesn't exist
-        if [ ! -f .eslintrc.js ] && [ ! -f .eslintrc.json ]; then
-          echo '{"extends": ["eslint:recommended"], "env": {"node": true, "es2021": true}, "parserOptions": {"ecmaVersion": 12}}' > .eslintrc.json
-        fi
-        npx eslint . --ext .js,.jsx --ignore-path ../.gitignore || echo "Linting completed with warnings"
-        
-    - name: 🧪 Run Unit Tests
-      run: |
-        echo "🧪 Running unit tests for ${{ matrix.service }}"
-        cd ${{ matrix.service }}
-        npm test || echo "Tests completed with warnings"
-        
-    - name: 🔍 Run npm audit
-      run: |
-        echo "🔍 Running npm audit for ${{ matrix.service }}"
-        cd ${{ matrix.service }}
-        npm audit --audit-level=moderate || echo "Audit completed with warnings"
+        npm ci || npm install
+        npm test
 
-  # 🏗️ Job 3: Build and Push Docker Images
-  build-and-push:
-    name: 🏗️ Build & Push Images
+  # 🏗️ Build & Push
+  build:
+    name: 🏗️ Build & Push
     runs-on: ubuntu-latest
-    needs: [detect-changes, test-suite]
-    if: needs.detect-changes.outputs.any-changes == 'true' && needs.detect-changes.outputs.is-rollback != 'true' && needs.detect-changes.outputs.is-health-check != 'true'
-    strategy:
-      matrix:
-        include:
-          - service: frontend
-            condition: ${{ needs.detect-changes.outputs.frontend-changed == 'true' }}
-          - service: game-service  
-            condition: ${{ needs.detect-changes.outputs.game-service-changed == 'true' }}
-          - service: order-service
-            condition: ${{ needs.detect-changes.outputs.order-service-changed == 'true' }}
-          - service: analytics-service
-            condition: ${{ needs.detect-changes.outputs.analytics-service-changed == 'true' }}
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      if: ${{ matrix.condition }}
-      
-    - name: 🐳 Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      if: ${{ matrix.condition }}
-      
-    - name: 🔐 Login to Docker Hub
-      uses: docker/login-action@v3
-      if: ${{ matrix.condition }}
-      with:
-        username: ${{ env.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_TOKEN }}
-        
-    - name: 📝 Docker Metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      if: ${{ matrix.condition }}
-      with:
-        images: ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}
-        tags: |
-          type=sha,format=long
-          type=raw,value=latest,enable={{is_default_branch}}
-          type=ref,event=branch
-          type=ref,event=pr
-          
-    - name: 🏗️ Build and Push Docker Image
-      uses: docker/build-push-action@v5
-      if: ${{ matrix.condition }}
-      with:
-        context: ./${{ matrix.service }}
-        platforms: linux/amd64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-  # 🔒 Job 4: Comprehensive Security Scanning
-  security-scan:
-    name: 🔒 Security Scanning
-    runs-on: ubuntu-latest
-    needs: [detect-changes, build-and-push]
-    if: (always() && needs.detect-changes.outputs.any-changes == 'true') || needs.detect-changes.outputs.is-security-scan == 'true'
+    needs: test
     strategy:
       matrix:
         service: [frontend, game-service, order-service, analytics-service]
     
     steps:
-    - name: 📥 Checkout Code
+    - name: 📥 Checkout
       uses: actions/checkout@v4
       
-    - name: 🔧 Setup Node.js 18 
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: ${{ matrix.service }}/package-lock.json
-        
-    - name: 📦 Install Dependencies
-      run: |
-        echo "📦 Installing dependencies for security scan: ${{ matrix.service }}"
-        cd ${{ matrix.service }}
-        npm ci
-        
-    - name: 🔍 Run Trivy Container Scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest
-        format: 'sarif'
-        output: 'trivy-results-${{ matrix.service }}.sarif'
-        
-    - name: 🔍 Run Trivy Filesystem Scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: './${{ matrix.service }}'
-        format: 'sarif'
-        output: 'trivy-fs-results-${{ matrix.service }}.sarif'
-        
-    - name: 📊 Upload Trivy Container Results
-      uses: github/codeql-action/upload-sarif@v3
-      continue-on-error: true
-      with:
-        sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
-        
-    - name: 📊 Upload Trivy Filesystem Results  
-      uses: github/codeql-action/upload-sarif@v3
-      continue-on-error: true
-      with:
-        sarif_file: 'trivy-fs-results-${{ matrix.service }}.sarif'
-        
-    - name: 🔍 Run Bandit Security Linter (Python files)
-      run: |
-        echo "🔍 Running Bandit security linter for ${{ matrix.service }}"
-        cd ${{ matrix.service }}
-        # Install bandit if Python files exist
-        if find . -name "*.py" -type f | head -1 | grep -q .; then
-          pip install bandit
-          bandit -r . -f json -o bandit-results.json || echo "Bandit scan completed with findings"
-        else
-          echo "No Python files found in ${{ matrix.service }}"
-        fi
-        
-    - name: 🔍 Run Semgrep Static Analysis
-      uses: returntocorp/semgrep-action@v1
-      with:
-        config: >- 
-          p/security-audit
-          p/secrets
-          p/nodejs
-      continue-on-error: true
+    - name: 🐳 Setup Docker
+      uses: docker/setup-buildx-action@v3
       
-    - name: 🔍 Enhanced npm audit
-      run: |
-        echo "🔍 Running enhanced npm audit for ${{ matrix.service }}"
-        cd ${{ matrix.service }}
-        npm audit --json > npm-audit-results.json || echo "npm audit completed with findings"
+    - name: 🔐 Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
         
-        # Generate readable summary
-        echo "📊 Security Summary for ${{ matrix.service }}:"
-        CRITICAL=$(cat npm-audit-results.json | grep -o '"critical":[0-9]*' | cut -d: -f2 || echo "0")
-        HIGH=$(cat npm-audit-results.json | grep -o '"high":[0-9]*' | cut -d: -f2 || echo "0")
-        MODERATE=$(cat npm-audit-results.json | grep -o '"moderate":[0-9]*' | cut -d: -f2 || echo "0")
-        
-        echo "  🔴 Critical vulnerabilities: $CRITICAL"
-        echo "  🟠 High vulnerabilities: $HIGH"  
-        echo "  🟡 Moderate vulnerabilities: $MODERATE"
+    - name: 🏗️ Build & Push
+      uses: docker/build-push-action@v5
+      with:
+        context: ./${{ matrix.service }}
+        push: true
+        tags: ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest
 
-  # 🚀 Job 5: Deploy to EKS (Rolling Deployment)
-  deploy-production:
+  # 🚀 Deploy
+  deploy:
     name: 🚀 Deploy to EKS
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-and-push, security-scan]
-    if: |
-      always() && 
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && 
-      needs.detect-changes.outputs.any-changes == 'true' &&
-      needs.detect-changes.outputs.is-rollback != 'true' &&
-      needs.detect-changes.outputs.is-health-check != 'true'
+    needs: build
     environment: production
     
     steps:
-    - name: 📥 Checkout Code
+    - name: 📥 Checkout
       uses: actions/checkout@v4
       
-    - name: 🔐 Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-        
-    - name: 🔗 Configure kubectl for EKS
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-        
-    - name: 🔗 Connect to EKS Cluster
-      run: |
-        echo "🔗 Connecting to EKS cluster..."
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        kubectl config current-context
-        
-    - name: ✅ Pre-deployment Health Check
-      run: |
-        echo "✅ Running pre-deployment health check..."
-        # Basic cluster health check
-        kubectl get nodes
-        kubectl get pods --all-namespaces | grep -v Running | grep -v Completed || echo "All pods running"
-        
-    - name: 🔄 Update Kubernetes Manifests with New Image Tags
-      run: |
-        echo "🔄 Updating Kubernetes manifests with new image tags..."
-        
-        # Update manifests with current commit SHA
-        find k8s/ -name "*.yaml" -exec sed -i "s|image: ${{ env.DOCKER_USERNAME }}/\([^:]*\):.*|image: ${{ env.DOCKER_USERNAME }}/\1:${{ github.sha }}|g" {} \;
-        
-        echo "📝 Updated image tags in manifests:"
-        grep "image: ${{ env.DOCKER_USERNAME }}" k8s/*.yaml || echo "No image updates found"
-        
-    - name: 🚀 Deploy to EKS (Apply All YAML Files)
-      run: |
-        echo "🚀 Starting rolling deployment to EKS..."
-        
-        # Apply secrets first
-        echo "🔐 Applying secrets..."
-        kubectl apply -f k8s/frontend-secret.yaml || echo "Frontend secret creation skipped"
-        kubectl apply -f k8s/game-db-secret.yaml || echo "Game DB secret creation skipped"  
-        kubectl apply -f k8s/order-db-secret.yaml || echo "Order DB secret creation skipped"
-        kubectl apply -f k8s/analytics-secret.yaml || echo "Analytics secret creation skipped"
-        
-        # Apply all deployment manifests
-        echo "🏗️ Applying deployments..."
-        kubectl apply -f k8s/frontend-deployment.yaml
-        kubectl apply -f k8s/game-service-deployment.yaml
-        kubectl apply -f k8s/order-service-deployment.yaml
-        kubectl apply -f k8s/analytics-service-deployment.yaml
-        
-        # Apply ingress
-        echo "🌐 Applying ingress..."
-        kubectl apply -f k8s/ingress.yaml
-        
-        # Clean any stuck pods
-        echo "🧹 Cleaning any pending/failed pods..."
-        kubectl delete pods --field-selector=status.phase=Pending --force --grace-period=0 || true
-        kubectl delete pods --field-selector=status.phase=Failed --force --grace-period=0 || true
-        
-    - name: ✅ Verify Deployment (Check pods, services, ingress)
-      run: |
-        echo "✅ Verifying deployment status..."
-        
-        # Wait for rollouts to complete
-        echo "⏳ Waiting for deployments to complete..."
-        kubectl rollout status deployment/frontend-deployment --timeout=300s || echo "Frontend rollout timeout"
-        kubectl rollout status deployment/game-service-deployment --timeout=300s || echo "Game service rollout timeout"
-        kubectl rollout status deployment/order-service-deployment --timeout=300s || echo "Order service rollout timeout"
-        kubectl rollout status deployment/analytics-service-deployment --timeout=300s || echo "Analytics service rollout timeout"
-        
-        # Verify pods are running
-        echo "🔍 Checking pod status..."
-        kubectl get pods -o wide
-        
-        # Verify services
-        echo "🔍 Checking services..."
-        kubectl get services
-        
-        # Verify ingress
-        echo "🔍 Checking ingress..."
-        kubectl get ingress
-        
-    - name: 🧪 Run Health Checks (Test All Services)
-      run: |
-        echo "🧪 Running comprehensive health checks..."
-        
-        # Define health check endpoints
-        FRONTEND_URL="http://localhost:8080"
-        GAME_SERVICE_URL="http://localhost:8082/health"
-        ORDER_SERVICE_URL="http://localhost:8083/health"  
-        ANALYTICS_SERVICE_URL="http://localhost:8084/health"
-        
-        echo "🏥 Health Check Endpoints:"
-        echo "  Frontend: $FRONTEND_URL"
-        echo "  Game Service: $GAME_SERVICE_URL"
-        echo "  Order Service: $ORDER_SERVICE_URL"
-        echo "  Analytics Service: $ANALYTICS_SERVICE_URL"
-        
-        # Wait a bit for services to fully start
-        sleep 30
-        
-        # Check if pods are ready
-        echo "📊 Pod readiness status:"
-        kubectl get pods -l app=frontend -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' || echo "Frontend pod check failed"
-        kubectl get pods -l app=game-service -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' || echo "Game service pod check failed"
-        kubectl get pods -l app=order-service -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' || echo "Order service pod check failed"
-        kubectl get pods -l app=analytics-service -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' || echo "Analytics service pod check failed"
-        
-    - name: 📊 Generate Deployment Summary
-      run: |
-        echo "📊 Generating deployment summary..."
-        echo "🎉 Deployment Summary:"
-        echo "  ✅ Branch: ${{ github.ref_name }}"
-        echo "  ✅ Commit: ${{ github.sha }}"
-        echo "  ✅ Timestamp: $(date)"
-        echo "  ✅ Changed Services:"
-        [ "${{ needs.detect-changes.outputs.frontend-changed }}" = "true" ] && echo "    - Frontend"
-        [ "${{ needs.detect-changes.outputs.game-service-changed }}" = "true" ] && echo "    - Game Service"
-        [ "${{ needs.detect-changes.outputs.order-service-changed }}" = "true" ] && echo "    - Order Service"
-        [ "${{ needs.detect-changes.outputs.analytics-service-changed }}" = "true" ] && echo "    - Analytics Service"
-        
-        echo "🌐 Application URLs:"
-        echo "  Frontend: http://lugx-games.local"
-        echo "  Game Service: http://lugx-games.local/api/games"
-        echo "  Order Service: http://lugx-games.local/api/orders"
-        echo "  Analytics Service: http://lugx-games.local/api/analytics"
-
-  # 🔄 Job 6: Manual Rollback Workflow
-  manual-rollback:
-    name: 🔄 Manual Rollback
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.is-rollback == 'true'
-    environment: production
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: 🔐 Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-        
-    - name: 🔗 Configure kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-        
-    - name: 🔗 Connect to EKS Cluster
-      run: |
-        echo "🔗 Connecting to EKS cluster..."
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        kubectl config current-context
-        
-    - name: 📋 Check Current Deployment Status
-      run: |
-        echo "📋 Checking current deployment status for ${{ github.event.inputs.deployment_name }}..."
-        kubectl get deployment ${{ github.event.inputs.deployment_name }} -o wide
-        kubectl rollout history deployment/${{ github.event.inputs.deployment_name }}
-        
-    - name: 🔄 Execute Rollback
-      run: |
-        echo "🔄 Executing rollback for ${{ github.event.inputs.deployment_name }}..."
-        
-        if [ -n "${{ github.event.inputs.rollback_revision }}" ]; then
-          echo "🔄 Rolling back to specific revision: ${{ github.event.inputs.rollback_revision }}"
-          kubectl rollout undo deployment/${{ github.event.inputs.deployment_name }} --to-revision=${{ github.event.inputs.rollback_revision }}
-        else
-          echo "🔄 Rolling back to previous revision"
-          kubectl rollout undo deployment/${{ github.event.inputs.deployment_name }}
-        fi
-        
-    - name: ✅ Verify Rollback
-      run: |
-        echo "✅ Verifying rollback success..."
-        kubectl rollout status deployment/${{ github.event.inputs.deployment_name }} --timeout=300s
-        kubectl get deployment ${{ github.event.inputs.deployment_name }} -o wide
-        
-    - name: 🧪 Health Check After Rollback
-      run: |
-        echo "🧪 Running health check after rollback..."
-        sleep 30
-        
-        # Check pod status
-        kubectl get pods -l app=$(echo ${{ github.event.inputs.deployment_name }} | sed 's/-deployment//') -o wide
-        
-        # Verify pod readiness
-        kubectl get pods -l app=$(echo ${{ github.event.inputs.deployment_name }} | sed 's/-deployment//') -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}'
-        
-    - name: 📊 Generate Rollback Summary
-      run: |
-        echo "📊 Generating rollback summary..."
-        echo "🔄 Rollback Summary:"
-        echo "  ✅ Deployment: ${{ github.event.inputs.deployment_name }}"
-        echo "  ✅ Revision: ${{ github.event.inputs.rollback_revision || 'Previous' }}"
-        echo "  ✅ Timestamp: $(date)"
-        echo "  ✅ Status: Completed"
-
-  # 📊 Job 7: Monitoring Workflow (15-minute Health Checks)
-  monitoring-health-checks:
-    name: 📊 Monitoring & Health Checks
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.is-health-check == 'true'
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: 🔐 Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-        
-    - name: 🔗 Configure kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-        
-    - name: 🔗 Connect to EKS Cluster
-      run: |
-        echo "🔗 Connecting to EKS cluster..."
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        
-    - name: 📊 Check Cluster Health
-      run: |
-        echo "📊 Checking EKS cluster health..."
-        echo "🔍 Node Status:"
-        kubectl get nodes -o wide
-        
-        echo "🔍 System Pods:"
-        kubectl get pods -n kube-system | grep -v Running | grep -v Completed || echo "All system pods running"
-        
-        echo "🔍 Resource Usage:"
-        kubectl top nodes || echo "Metrics server not available"
-        
-    - name: 🧪 Run Health Checks
-      run: |
-        echo "🧪 Running comprehensive health checks..."
-        
-        # Check all application pods
-        echo "🔍 Application Pod Status:"
-        kubectl get pods -o wide | grep -E "(frontend|game-service|order-service|analytics-service)" || echo "No application pods found"
-        
-        # Check services
-        echo "🔍 Service Status:"
-        kubectl get services
-        
-        # Check ingress
-        echo "🔍 Ingress Status:"
-        kubectl get ingress
-        
-    - name: 📈 Check Metrics
-      run: |
-        echo "📈 Checking application metrics..."
-        
-        # Health check endpoints
-        METRICS_ENDPOINTS=(
-          "game-service:8082/metrics"
-          "order-service:8083/metrics"
-          "analytics-service:8084/metrics"
-        )
-        
-        echo "📊 Metrics Endpoints:"
-        for endpoint in "${METRICS_ENDPOINTS[@]}"; do
-          echo "  📈 http://localhost:$endpoint"
-        done
-        
-    - name: 🚨 Check for Issues
-      run: |
-        echo "🚨 Checking for system issues..."
-        
-        # Check for failed pods
-        FAILED_PODS=$(kubectl get pods --field-selector=status.phase=Failed --no-headers | wc -l)
-        PENDING_PODS=$(kubectl get pods --field-selector=status.phase=Pending --no-headers | wc -l)
-        
-        echo "🔍 Issue Summary:"
-        echo "  🔴 Failed Pods: $FAILED_PODS"
-        echo "  🟡 Pending Pods: $PENDING_PODS"
-        
-        if [ "$FAILED_PODS" -gt 0 ]; then
-          echo "⚠️ Failed pods detected:"
-          kubectl get pods --field-selector=status.phase=Failed
-        fi
-        
-        if [ "$PENDING_PODS" -gt 0 ]; then
-          echo "⚠️ Pending pods detected:"
-          kubectl get pods --field-selector=status.phase=Pending
-        fi
-        
-    - name: 📊 Generate Monitoring Report
-      run: |
-        echo "📊 Generating monitoring report..."
-        echo "🏥 Health Check Report - $(date):"
-        echo "  ✅ Cluster Status: $(kubectl get nodes --no-headers | wc -l) nodes ready"
-        echo "  ✅ Application Pods: $(kubectl get pods | grep -E "(frontend|game|order|analytics)" | grep Running | wc -l) running"
-        echo "  ✅ Services: $(kubectl get services --no-headers | wc -l) active"
-        echo "  ✅ Check Interval: Every 15 minutes"
-        
-        # Performance summary
-        echo "📈 Performance Summary:"
-        echo "  Frontend: http://localhost:8080/"
-        echo "  Game Service: http://localhost:8082/health"
-        echo "  Order Service: http://localhost:8083/health"
-        echo "  Analytics Service: http://localhost:8084/health"
-
-  # 🧪 Job 8: Post-Deployment Integration Tests
-  integration-tests:
-    name: 🧪 Integration Tests
-    runs-on: ubuntu-latest
-    needs: deploy-production
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: 🔐 Configure AWS Credentials
+    - name: 🔐 Setup AWS
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -698,93 +87,8 @@ jobs:
       with:
         version: 'latest'
         
-    - name: 🔗 Connect to EKS Cluster
+    - name: 🚀 Deploy
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        
-    - name: 🧪 Run Integration Tests
-      run: |
-        echo "🧪 Running comprehensive integration tests..."
-        
-        # Wait for services to be ready
-        sleep 60
-        
-        # Test service connectivity
-        echo "🔍 Testing service connectivity..."
-        
-        # Check if services are responding
-        kubectl get pods -l app=frontend -o jsonpath='{.items[0].metadata.name}' | xargs kubectl logs --tail=5 || echo "Frontend logs checked"
-        kubectl get pods -l app=game-service -o jsonpath='{.items[0].metadata.name}' | xargs kubectl logs --tail=5 || echo "Game service logs checked"
-        kubectl get pods -l app=order-service -o jsonpath='{.items[0].metadata.name}' | xargs kubectl logs --tail=5 || echo "Order service logs checked"
-        kubectl get pods -l app=analytics-service -o jsonpath='{.items[0].metadata.name}' | xargs kubectl logs --tail=5 || echo "Analytics service logs checked"
-        
-    - name: 🔍 Verify Database Connectivity
-      run: |
-        echo "🔍 Verifying database and analytics connectivity..."
-        
-        # Check RDS connectivity through game service
-        echo "🗄️ Testing RDS connectivity via Game Service..."
-        GAME_POD=$(kubectl get pods -l app=game-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        if [ -n "$GAME_POD" ]; then
-          kubectl logs $GAME_POD --tail=20 | grep -i "connected\|database\|error" || echo "Game service database logs checked"
-        fi
-        
-        # Check ClickHouse connectivity through analytics service
-        echo "📊 Testing ClickHouse connectivity via Analytics Service..."
-        ANALYTICS_POD=$(kubectl get pods -l app=analytics-service -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        if [ -n "$ANALYTICS_POD" ]; then
-          kubectl logs $ANALYTICS_POD --tail=20 | grep -i "clickhouse\|connected\|error" || echo "Analytics service ClickHouse logs checked"
-        fi
-
-  # 🚨 Job 9: Automatic Rollback on Failure
-  automatic-rollback:
-    name: 🚨 Auto Rollback on Failure
-    runs-on: ubuntu-latest
-    needs: [deploy-production, integration-tests]
-    if: failure() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-    
-    steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: 🔐 Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-        
-    - name: 🔗 Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-        
-    - name: 🔗 Connect to EKS Cluster
-      run: |
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        
-    - name: 🚨 Execute Automatic Rollback
-      run: |
-        echo "🚨 Deployment failed - executing automatic rollback..."
-        
-        # Rollback all deployments that might have been updated
-        DEPLOYMENTS=("frontend-deployment" "game-service-deployment" "order-service-deployment" "analytics-service-deployment")
-        
-        for deployment in "${DEPLOYMENTS[@]}"; do
-          echo "🔄 Rolling back $deployment..."
-          kubectl rollout undo deployment/$deployment || echo "Rollback failed for $deployment"
-          kubectl rollout status deployment/$deployment --timeout=300s || echo "Rollback verification failed for $deployment"
-        done
-        
-    - name: ✅ Verify Rollback Success
-      run: |
-        echo "✅ Verifying rollback success..."
-        
-        # Wait for rollbacks to complete
-        sleep 60
-        
-        # Check all deployments
-        kubectl get deployments -o wide
-        kubectl get pods -o wide
-        
-        echo "🎉 Automatic rollback completed. System restored to previous stable state."
+        kubectl apply -f k8s/
+        echo "✅ Deployed successfully!"
