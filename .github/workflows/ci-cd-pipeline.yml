@@ -154,7 +154,7 @@ jobs:
     if: needs.detect-changes.outputs.any-changes == 'true' && needs.detect-changes.outputs.is-rollback != 'true' && needs.detect-changes.outputs.is-health-check != 'true'
     strategy:
       matrix:
-        service: [frontend, game-service, order-service, analytics-service]
+        service: [frontend, game-service, order-service]
     
     steps:
     - name: 📥 Checkout Code
