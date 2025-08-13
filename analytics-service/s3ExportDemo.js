@@ -37,7 +37,6 @@ class DemoS3ExportService {
       const result = await this.s3Client.send(command);
       
       console.log('✅ S3 Authentication successful!');
-      console.log(`📦 Available buckets: ${result.Buckets?.map(b => b.Name).join(', ') || 'None'}`);
       
       // Check if our target bucket exists
       const bucketExists = result.Buckets?.some(bucket => bucket.Name === this.bucketName);

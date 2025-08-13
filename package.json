@@ -1,0 +1,23 @@
+{
+  "name": "lugx-gaming-k8s",
+  "version": "1.0.0",
+  "main": "test-analytics-flow.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spmani99/lugx-gaming-k8s.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/spmani99/lugx-gaming-k8s/issues"
+  },
+  "homepage": "https://github.com/spmani99/lugx-gaming-k8s#readme",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.11.0"
+  }
+}

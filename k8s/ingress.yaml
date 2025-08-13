@@ -8,8 +8,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: lugx-games.local
-      http:
+    - http:
         paths:
           - path: /()(.*)
             pathType: ImplementationSpecific

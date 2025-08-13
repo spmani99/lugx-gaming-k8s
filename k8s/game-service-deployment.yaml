@@ -27,15 +27,15 @@ spec:
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: game-db-secret
+                  name: gamedb-secret
                   key: root_username
             - name: DB_PASS
               valueFrom:
                 secretKeyRef:
-                  name: game-db-secret
+                  name: gamedb-secret
                   key: root_password
             - name: DB_HOST
-              value: "lugx-games-mysql.ca1uo2uoa8cu.us-east-1.rds.amazonaws.com"
+              value: "lugx-mysql-db.c0toi2wc0ylu.us-east-1.rds.amazonaws.com"
             - name: DB_PORT
               value: "3306"
             - name: DB_NAME

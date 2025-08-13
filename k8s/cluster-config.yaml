@@ -8,11 +8,11 @@ metadata:
 
 managedNodeGroups:
   - name: lugx-workers
-    instanceType: t3.small
-    minSize: 1
-    maxSize: 3
-    desiredCapacity: 2
-    volumeSize: 20
+    instanceType: m5.large
+    minSize: 2              
+    maxSize: 5              
+    desiredCapacity: 3       
+    volumeSize: 50         
     ssh:
       allow: true
     labels:
@@ -31,6 +31,7 @@ managedNodeGroups:
         efs: true
         ebs: true
         cloudWatch: true
+        albIngress: true          
 
 vpc:
   cidr: 192.168.0.0/16

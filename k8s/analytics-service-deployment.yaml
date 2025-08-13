@@ -64,7 +64,7 @@ spec:
             - name: PORT
               value: "3003"
             - name: UPLOAD_INTERVAL_MINUTES
-              value: "5"
+              value: "3"
 
 ---
 apiVersion: v1

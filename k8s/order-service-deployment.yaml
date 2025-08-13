@@ -25,7 +25,7 @@ spec:
             - containerPort: 3002
           env:
             - name: DB_HOST
-              value: "lugx-games-mysql.ca1uo2uoa8cu.us-east-1.rds.amazonaws.com"
+              value: "lugx-mysql-db.c0toi2wc0ylu.us-east-1.rds.amazonaws.com"
             - name: DB_PORT
               value: "3306"
             - name: DB_NAME
@@ -33,12 +33,12 @@ spec:
             - name: DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: order-db-secret
+                  name: orderdb-secret
                   key: root_username
             - name: DB_PASS
               valueFrom:
                 secretKeyRef:
-                  name: order-db-secret
+                  name: orderdb-secret
                   key: root_password
             - name: API_KEY
               value: "lgx_admin_z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4"
