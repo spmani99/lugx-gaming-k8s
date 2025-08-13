@@ -18,9 +18,9 @@ class DemoS3ExportService {
     // IMPORTANT: Initialize lastUploadTime properly for UTC comparison
     this.lastUploadTime = new Date(); // This will be in UTC when converted to ISO string
     
-    console.log(`🚀 Demo S3 Export: Uploading every ${this.uploadInterval} minutes to ${this.bucketName}`);
-    console.log(`🕒 Initial lastUploadTime (UTC): ${this.lastUploadTime.toISOString()}`);
-    console.log(`🕒 Initial lastUploadTime (IST): ${this.lastUploadTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+    console.log(`Demo S3 Export: Uploading every ${this.uploadInterval} minutes to ${this.bucketName}`);
+    console.log(`Initial lastUploadTime (UTC): ${this.lastUploadTime.toISOString()}`);
+    console.log(`Initial lastUploadTime (IST): ${this.lastUploadTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
     
     // Test S3 connection after a short delay (to let the service start)
     setTimeout(() => this.testS3Connection(), 5000);
@@ -30,30 +30,30 @@ class DemoS3ExportService {
 
   async testS3Connection() {
     try {
-      console.log('🧪 Testing S3 connection and credentials...');
+      console.log('Testing S3 connection and credentials...');
       
       const { ListBucketsCommand } = require('@aws-sdk/client-s3');
       const command = new ListBucketsCommand({});
       const result = await this.s3Client.send(command);
       
-      console.log('✅ S3 Authentication successful!');
+      console.log('S3 Authentication successful!');
       
       // Check if our target bucket exists
       const bucketExists = result.Buckets?.some(bucket => bucket.Name === this.bucketName);
       if (bucketExists) {
-        console.log(`✅ Target bucket '${this.bucketName}' exists and accessible`);
+        console.log(`Target bucket '${this.bucketName}' exists and accessible`);
       } else {
-        console.log(`⚠️  Target bucket '${this.bucketName}' NOT found in your AWS account`);
-        console.log(`📝 You may need to create it or check bucket permissions`);
+        console.log(`WARNING: Target bucket '${this.bucketName}' NOT found in your AWS account`);
+        console.log(`NOTE: You may need to create it or check bucket permissions`);
       }
       
       return true;
     } catch (error) {
-      console.error('❌ S3 Connection test failed:', error.name, error.message);
+      console.error('ERROR: S3 Connection test failed:', error.name, error.message);
       if (error.name === 'CredentialsError') {
-        console.log('🔑 Check your AWS credentials');
+        console.log('Check your AWS credentials');
       } else if (error.name === 'UnknownEndpoint') {
-        console.log('🌍 Check your AWS region setting');
+        console.log('Check your AWS region setting');
       }
       return false;
     }
@@ -62,13 +62,13 @@ class DemoS3ExportService {
   startScheduledUploads() {
     // Upload aggregated data every X minutes
     setInterval(async () => {
-      console.log('📊 Starting scheduled S3 upload...');
+      console.log('Starting scheduled S3 upload...');
       await this.uploadRecentAnalytics();
     }, this.uploadInterval * 60 * 1000);
     
     // REDUCED initial upload time for testing - start after 30 seconds instead of 1 minute
     setTimeout(async () => {
-      console.log('🎯 Initial S3 upload starting...');
+      console.log('Initial S3 upload starting...');
       await this.uploadRecentAnalytics();
     }, 30000); // 30 seconds
   }
@@ -83,7 +83,7 @@ class DemoS3ExportService {
       const endTime = now;
       
       // Debug logging
-      console.log(`📤 Time window check:`);
+      console.log(`Time window check:`);
       console.log(`  - Start (UTC): ${startTime.toISOString()}`);
       console.log(`  - End (UTC): ${endTime.toISOString()}`);
       console.log(`  - Start (IST): ${startTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
@@ -94,19 +94,19 @@ class DemoS3ExportService {
       const hasData = await this.hasMeaningfulData(startTime, endTime);
       
       if (!hasData) {
-        console.log(`⏭️ Skipping upload - no meaningful data in specified time range`);
+        console.log(`Skipping upload - no meaningful data in specified time range`);
         
         // Debug: Check for any data in the last hour
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-        console.log(`🔍 Checking for any data in last hour...`);
+        console.log(`Checking for any data in last hour...`);
         const recentData = await this.hasMeaningfulData(oneHourAgo, now);
-        console.log(`🔍 Found data in last hour: ${recentData}`);
+        console.log(`Found data in last hour: ${recentData}`);
         
         this.lastUploadTime = now;
         return { success: true, skipped: true, reason: 'no_meaningful_data' };
       }
 
-      console.log(`✅ Found meaningful data, proceeding with upload...`);
+      console.log(`Found meaningful data, proceeding with upload...`);
 
       // Aggregate and upload all data types in parallel
       const uploads = await Promise.allSettled([
@@ -120,15 +120,15 @@ class DemoS3ExportService {
       const successful = uploads.filter(result => result.status === 'fulfilled' && result.value !== null).length;
       
       if (successful > 0) {
-        console.log(`✅ S3 Upload completed: ${successful}/${uploads.length} files uploaded`);
+        console.log(`S3 Upload completed: ${successful}/${uploads.length} files uploaded`);
       } else {
-        console.log(`⏭️ All uploads skipped - aggregated data was empty`);
+        console.log(`All uploads skipped - aggregated data was empty`);
       }
 
       this.lastUploadTime = now;
       return { success: true, uploads: successful, total: uploads.length, timestamp };
     } catch (error) {
-      console.error('❌ Error in scheduled S3 upload:', error);
+      console.error('ERROR: Error in scheduled S3 upload:', error);
       return { success: false, error: error.message };
     }
   }
@@ -156,11 +156,11 @@ class DemoS3ExportService {
   async getRecordCount(table, startTime, endTime) {
     try {
       if (!clickHouse.isConnected) {
-        console.log(`❌ ClickHouse not connected for ${table}`);
+        console.log(`ERROR: ClickHouse not connected for ${table}`);
         return 0;
       }
       
-      console.log(`🔍 Querying ${table}:`);
+      console.log(`Querying ${table}:`);
       console.log(`    Time range: ${startTime.toISOString()} to ${endTime.toISOString()}`);
       
       const result = await clickHouse.client.query({
@@ -197,7 +197,7 @@ class DemoS3ExportService {
       
       return count;
     } catch (error) {
-      console.error(`❌ Error counting records in ${table}:`, error);
+      console.error(`ERROR: Error counting records in ${table}:`, error);
       return 0;
     }
   }
@@ -207,7 +207,7 @@ class DemoS3ExportService {
       const aggregatedData = await this.getAggregatedPageViews(startTime, endTime);
       
       if (aggregatedData.length === 0) {
-        console.log('📄 No page views to upload');
+        console.log('No page views to upload');
         return null;
       }
 

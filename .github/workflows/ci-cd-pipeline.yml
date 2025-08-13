@@ -81,6 +81,14 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
+        mask-aws-account-id: false
+        
+    - name: 🔍 Verify AWS Identity
+      run: |
+        echo "Testing AWS credentials..."
+        aws sts get-caller-identity
+        echo "Testing EKS access..."
+        aws eks describe-cluster --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         
     - name: 🔗 Setup kubectl
       uses: azure/setup-kubectl@v3
@@ -89,6 +97,19 @@ jobs:
         
     - name: 🚀 Deploy
       run: |
+        echo "📡 Updating kubeconfig..."
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+        
+        echo "🔍 Verifying kubectl connectivity..."
+        kubectl cluster-info
+        kubectl get nodes
+        
+        echo "📋 Applying Kubernetes manifests..."
+        kubectl apply -f k8s/ --validate=true --dry-run=client
         kubectl apply -f k8s/
+        
+        echo "🔍 Checking deployment status..."
+        kubectl get pods -A
+        kubectl get services -A
+        
         echo "✅ Deployed successfully!"
