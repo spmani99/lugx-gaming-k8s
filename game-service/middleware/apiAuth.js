@@ -18,8 +18,8 @@ class GameAPIKeyManager {
       createdAt: new Date()
     });
 
-    console.log('🔑 Game Service API Key:');
-    console.log(`🎮 API Key: ${apiKey}`);
+    console.log('Game Service API Key:');
+    console.log(`API Key: ${apiKey}`);
   }
 
   validateAPIKey(apiKey) {

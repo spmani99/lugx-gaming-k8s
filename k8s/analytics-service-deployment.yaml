@@ -25,42 +25,21 @@ spec:
             - containerPort: 3003
           env:
             - name: DEBUG_ANALYTICS
-              value: "false"
+              value: "true"
             - name: CLICKHOUSE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: analytics-secret
-                  key: clickhouse_url
+              value: "http://localhost:8123"
             - name: CLICKHOUSE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: analytics-secret
-                  key: clickhouse_user
+              value: "default"
             - name: CLICKHOUSE_PASSWORD_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: analytics-secret
-                  key: clickhouse_password
+              value: "password"
             - name: AWS_REGION
-              valueFrom:
-                secretKeyRef:
-                  name: analytics-secret
-                  key: aws_region
+              value: "us-east-1"
             - name: AWS_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: analytics-secret
-                  key: aws_access_key_id
+              value: "dummy"
             - name: AWS_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: analytics-secret
-                  key: aws_secret_access_key
+              value: "dummy"
             - name: S3_BUCKET_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: analytics-secret
-                  key: s3_bucket_name
+              value: "dummy-bucket"
             - name: PORT
               value: "3003"
             - name: UPLOAD_INTERVAL_MINUTES

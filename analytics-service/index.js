@@ -10,9 +10,9 @@ const demoS3Export = require('./s3ExportDemo');
 const app = express();
 const port = process.env.PORT || 3003;
 
-// Enable CORS for frontend
+// Enable CORS for frontend (simplified for containerized environment)
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+  origin: true, // Allow all origins when behind ingress
   credentials: true
 }));
 
@@ -40,7 +40,30 @@ const getDeviceType = (userAgent) => {
 // Routes
 app.get('/', (req, res) => res.send('Analytics Service Running - ClickHouse + S3 Export Demo'));
 
-// ✅ Track Page View - ONLY CLICKHOUSE (No MySQL)
+// Test endpoint for debugging routing
+app.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Analytics service test endpoint',
+    timestamp: new Date().toISOString(),
+    routes: [
+      'GET /',
+      'GET /test',
+      'GET /health',
+      'POST /track/pageview',
+      'POST /track/click',
+      'POST /track/scroll',
+      'POST /track/session',
+      'POST /track/event',
+      'GET /analytics/realtime/pageviews',
+      'GET /analytics/heatmap/:pageUrl',
+      'GET /analytics/scroll/:pageUrl',
+      'GET /analytics/dashboard'
+    ]
+  });
+});
+
+// Track Page View - ONLY CLICKHOUSE (No MySQL)
 app.post('/track/pageview', async (req, res) => {
   try {
     const {
@@ -70,8 +93,13 @@ app.post('/track/pageview', async (req, res) => {
       device
     };
 
-    // ✅ ONLY Store in ClickHouse (MySQL removed)
-    await clickHouse.insertPageView(pageViewData);
+    // ONLY Store in ClickHouse (MySQL removed)  
+    try {
+      await clickHouse.insertPageView(pageViewData);
+    } catch (dbError) {
+      console.warn('ClickHouse error (continuing anyway):', dbError.message);
+      // Continue anyway - don't fail tracking due to DB issues
+    }
 
     res.status(200).json({ success: true, message: 'Page view tracked successfully' });
   } catch (error) {
@@ -80,7 +108,7 @@ app.post('/track/pageview', async (req, res) => {
   }
 });
 
-// ✅ Track Click Event - ONLY CLICKHOUSE
+// Track Click Event - ONLY CLICKHOUSE
 app.post('/track/click', async (req, res) => {
   try {
     const {
@@ -106,7 +134,12 @@ app.post('/track/click', async (req, res) => {
     };
 
     // ✅ ONLY Store in ClickHouse
-    await clickHouse.insertClickEvent(clickEventData);
+    try {
+      await clickHouse.insertClickEvent(clickEventData);
+    } catch (dbError) {
+      console.warn('ClickHouse error (continuing anyway):', dbError.message);
+      // Continue anyway - don't fail tracking due to DB issues
+    }
 
     res.status(200).json({ success: true, message: 'Click event tracked successfully' });
   } catch (error) {
@@ -115,7 +148,7 @@ app.post('/track/click', async (req, res) => {
   }
 });
 
-// ✅ Track Scroll Depth - ONLY CLICKHOUSE
+// Track Scroll Depth - ONLY CLICKHOUSE
 app.post('/track/scroll', async (req, res) => {
   try {
     const {
@@ -150,7 +183,7 @@ app.post('/track/scroll', async (req, res) => {
   }
 });
 
-// ✅ Track Session - ONLY CLICKHOUSE
+// Track Session - ONLY CLICKHOUSE
 app.post('/track/session', async (req, res) => {
   try {
     const {
@@ -188,7 +221,7 @@ app.post('/track/session', async (req, res) => {
   }
 });
 
-// ✅ Track Custom Event - ONLY CLICKHOUSE
+// Track Custom Event - ONLY CLICKHOUSE
 app.post('/track/event', async (req, res) => {
   try {
     const {
@@ -218,7 +251,7 @@ app.post('/track/event', async (req, res) => {
   }
 });
 
-// 📊 Analytics Query Endpoints (ClickHouse only)
+// Analytics Query Endpoints (ClickHouse only)
 
 // Real-time page views endpoint (matching frontend expectation)
 app.get('/analytics/realtime/pageviews', async (req, res) => {
@@ -296,10 +329,10 @@ app.get('/analytics/dashboard', async (req, res) => {
   }
 });
 
-// 🎯 Demo S3 Export Endpoints
+// Demo S3 Export Endpoints
 app.post('/demo/upload-now', async (req, res) => {
   try {
-    console.log('🎯 Demo: Manual S3 upload triggered');
+    console.log('Demo: Manual S3 upload triggered');
     const result = await demoS3Export.triggerManualUpload();
     
     res.status(200).json({ 
@@ -336,8 +369,8 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Analytics Service running on port ${port}`);
-  console.log('📊 Mode: ClickHouse + S3 Export Demo');
-  console.log(`🪣 S3 Bucket: ${process.env.S3_BUCKET_NAME || 'lugx-analytics-demo'}`);
-  console.log(`⏰ Upload Interval: ${process.env.UPLOAD_INTERVAL_MINUTES || 10} minutes`);
+  console.log(`Analytics Service running on port ${port}`);
+  console.log('Mode: ClickHouse + S3 Export Demo');
+  console.log(`S3 Bucket: ${process.env.S3_BUCKET_NAME || 'lugx-analytics-demo'}`);
+  console.log(`Upload Interval: ${process.env.UPLOAD_INTERVAL_MINUTES || 10} minutes`);
 });

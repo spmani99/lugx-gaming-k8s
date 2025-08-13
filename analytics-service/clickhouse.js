@@ -18,7 +18,7 @@ class ClickHouseService {
     };
     
     // Debug credential detection
-    console.log('🔧 ClickHouse Credential Check:');
+    console.log('ClickHouse Credential Check:');
     console.log(`   URL: "${config.url}"`);
     console.log(`   Username: "${config.username}"`);
     console.log(`   Password: "${config.password ? '[SET]' : '[EMPTY]'}"`);
@@ -28,11 +28,11 @@ class ClickHouseService {
     const hasRealCredentials = this.validateCredentials(config);
     
     if (hasRealCredentials) {
-      console.log('✅ Real credentials detected, attempting ClickHouse connection');
+      console.log('Real credentials detected, attempting ClickHouse connection');
       this.client = createClient(config);
       this.initializeDatabase();
     } else {
-      this.logWithIST('⚠️  ClickHouse: No real credentials provided, running in mock mode');
+      this.logWithIST('WARNING: ClickHouse: No real credentials provided, running in mock mode');
       this.isConnected = false;
     }
   }
@@ -44,7 +44,7 @@ class ClickHouseService {
     
     // Check URL - reject known placeholder URLs (but allow K8s services)
     if (!config.url) {
-      console.log('❌ No URL provided');
+      console.log('ERROR: No URL provided');
       return false;
     }
     
@@ -52,16 +52,16 @@ class ClickHouseService {
     if (!isKubernetesService) {
       if (config.url.includes('your-clickhouse-url') || 
           config.url === 'https://akl2spzdfi.us-east-2.aws.clickhouse.cloud:8443') {
-        console.log('❌ Placeholder URL detected');
+        console.log('ERROR: Placeholder URL detected');
         return false;
       }
     } else {
-      console.log('✅ Kubernetes service URL detected, allowing');
+      console.log('Kubernetes service URL detected, allowing');
     }
 
     // Check username
     if (!config.username || config.username.trim() === '') {
-      console.log('❌ Empty username detected');
+      console.log('ERROR: Empty username detected');
       return false;
     }
 
@@ -70,18 +70,18 @@ class ClickHouseService {
       // If password is set, check it's not a placeholder
       if (config.password === 'your-secure-password' || 
           config.password === 'your-password') {
-        console.log('❌ Placeholder password detected');
+        console.log('ERROR: Placeholder password detected');
         return false;
       }
     }
 
     // Special case: reject if it's the demo hardcoded password from the original code
     if (config.password === 'jg3YoKz2K~vw9') {
-      console.log('❌ Demo/hardcoded password detected');
+      console.log('ERROR: Demo/hardcoded password detected');
       return false;
     }
 
-    console.log('✅ Credentials appear valid (empty password allowed for default user)');
+    console.log('Credentials appear valid (empty password allowed for default user)');
     return true;
   }
 
@@ -111,7 +111,7 @@ class ClickHouseService {
     try {
       // Test connection first
       await this.client.ping();
-      this.logWithIST('✅ ClickHouse connection successful');
+      this.logWithIST('ClickHouse connection successful');
       this.isConnected = true;
 
       // Create database if it doesn't exist
@@ -224,9 +224,9 @@ class ClickHouseService {
         `
       });
 
-      this.logWithIST('✅ ClickHouse analytics database and tables initialized successfully');
+      this.logWithIST('ClickHouse analytics database and tables initialized successfully');
     } catch (error) {
-      this.logWithIST(`❌ Error initializing ClickHouse database: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error initializing ClickHouse database: ${error.message}`, true);
       this.isConnected = false;
     }
   }
@@ -234,7 +234,7 @@ class ClickHouseService {
   // Insert methods for real-time streaming
   async insertPageView(data) {
     if (this.debugMode) {
-      this.logWithIST(`🔍 DEBUG: Received page view data: ${JSON.stringify(data, null, 2)}`);
+      this.logWithIST(`DEBUG: Received page view data: ${JSON.stringify(data, null, 2)}`);
     }
 
     if (!this.isConnected) {
@@ -262,20 +262,20 @@ class ClickHouseService {
       });
       
       if (this.debugMode) {
-        this.logWithIST('✅ Page view inserted successfully');
+        this.logWithIST('Page view inserted successfully');
       }
     } catch (error) {
-      this.logWithIST(`❌ Error inserting page view to ClickHouse: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error inserting page view to ClickHouse: ${error.message}`, true);
     }
   }
 
   async insertClickEvent(data) {
     if (this.debugMode) {
-      this.logWithIST(`🔍 DEBUG: Received click event data: ${JSON.stringify(data, null, 2)}`);
+      this.logWithIST(`DEBUG: Received click event data: ${JSON.stringify(data, null, 2)}`);
     }
 
     if (!this.isConnected) {
-      this.logWithIST('⚠️  ClickHouse not connected, skipping click event insert');
+      this.logWithIST('WARNING: ClickHouse not connected, skipping click event insert');
       return;
     }
 
@@ -297,20 +297,20 @@ class ClickHouseService {
       });
 
       if (this.debugMode) {
-        this.logWithIST('✅ Click event inserted successfully');
+        this.logWithIST('Click event inserted successfully');
       }
     } catch (error) {
-      this.logWithIST(`❌ Error inserting click event to ClickHouse: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error inserting click event to ClickHouse: ${error.message}`, true);
     }
   }
 
   async insertScrollDepth(data) {
     if (this.debugMode) {
-      this.logWithIST(`🔍 DEBUG: Received scroll depth data: ${JSON.stringify(data, null, 2)}`);
+      this.logWithIST(`DEBUG: Received scroll depth data: ${JSON.stringify(data, null, 2)}`);
     }
 
     if (!this.isConnected) {
-      this.logWithIST('⚠️  ClickHouse not connected, skipping scroll depth insert');
+      this.logWithIST('WARNING: ClickHouse not connected, skipping scroll depth insert');
       return;
     }
 
@@ -331,20 +331,20 @@ class ClickHouseService {
       });
 
       if (this.debugMode) {
-        this.logWithIST('✅ Scroll depth inserted successfully');
+        this.logWithIST('Scroll depth inserted successfully');
       }
     } catch (error) {
-      this.logWithIST(`❌ Error inserting scroll depth to ClickHouse: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error inserting scroll depth to ClickHouse: ${error.message}`, true);
     }
   }
 
   async insertSession(data) {
     if (this.debugMode) {
-      this.logWithIST(`🔍 DEBUG: Received session data: ${JSON.stringify(data, null, 2)}`);
+      this.logWithIST(`DEBUG: Received session data: ${JSON.stringify(data, null, 2)}`);
     }
 
     if (!this.isConnected) {
-      this.logWithIST('⚠️  ClickHouse not connected, skipping session insert');
+      this.logWithIST('WARNING: ClickHouse not connected, skipping session insert');
       return;
     }
 
@@ -366,20 +366,20 @@ class ClickHouseService {
       });
 
       if (this.debugMode) {
-        this.logWithIST('✅ Session inserted successfully');
+        this.logWithIST('Session inserted successfully');
       }
     } catch (error) {
-      this.logWithIST(`❌ Error inserting session to ClickHouse: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error inserting session to ClickHouse: ${error.message}`, true);
     }
   }
 
   async insertCustomEvent(data) {
     if (this.debugMode) {
-      this.logWithIST(`🔍 DEBUG: Received custom event data: ${JSON.stringify(data, null, 2)}`);
+      this.logWithIST(`DEBUG: Received custom event data: ${JSON.stringify(data, null, 2)}`);
     }
 
     if (!this.isConnected) {
-      this.logWithIST('⚠️  ClickHouse not connected, skipping custom event insert');
+      this.logWithIST('WARNING: ClickHouse not connected, skipping custom event insert');
       return;
     }
 
@@ -398,10 +398,10 @@ class ClickHouseService {
       });
 
       if (this.debugMode) {
-        this.logWithIST('✅ Custom event inserted successfully');
+        this.logWithIST('Custom event inserted successfully');
       }
     } catch (error) {
-      this.logWithIST(`❌ Error inserting custom event to ClickHouse: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error inserting custom event to ClickHouse: ${error.message}`, true);
     }
   }
 
@@ -431,7 +431,7 @@ class ClickHouseService {
       
       return await result.json();
     } catch (error) {
-      this.logWithIST(`❌ Error fetching realtime page views: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error fetching realtime page views: ${error.message}`, true);
       return [];
     }
   }
@@ -439,7 +439,7 @@ class ClickHouseService {
   async getRealtimeClickHeatmap(pageUrl, minutes = 30) {
     try {
       if (!this.isConnected) {
-        this.logWithIST('⚠️  ClickHouse not connected, returning empty click heatmap');
+        this.logWithIST('WARNING: ClickHouse not connected, returning empty click heatmap');
         return [];
       }
 
@@ -492,7 +492,7 @@ class ClickHouseService {
       
       return await result.json();
     } catch (error) {
-      this.logWithIST(`❌ Error fetching scroll analytics: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error fetching scroll analytics: ${error.message}`, true);
       return [];
     }
   }
@@ -501,7 +501,7 @@ class ClickHouseService {
   async getDashboardData(hours = 24) {
     try {
       if (!this.isConnected) {
-        this.logWithIST('⚠️  ClickHouse not connected, returning empty dashboard data');
+        this.logWithIST('WARNING: ClickHouse not connected, returning empty dashboard data');
         return null;
       }
 
@@ -522,7 +522,7 @@ class ClickHouseService {
         deviceBreakdown
       };
     } catch (error) {
-      this.logWithIST(`❌ Error fetching dashboard data: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error fetching dashboard data: ${error.message}`, true);
       return null;
     }
   }
@@ -633,7 +633,7 @@ class ClickHouseService {
       
       return await result.json();
     } catch (error) {
-      this.logWithIST(`❌ Error fetching data for MySQL sync: ${error.message}`, true);
+      this.logWithIST(`ERROR: Error fetching data for MySQL sync: ${error.message}`, true);
       return [];
     }
   }

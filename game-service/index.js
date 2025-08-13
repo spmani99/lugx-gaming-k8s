@@ -20,7 +20,7 @@ app.use(express.json());
 
 // Sync DB and seed categories
 sequelize.sync().then(async () => {
-  console.log('🎮 Game Service Database Synced');
+  console.log('Game Service Database Synced');
   
   // Seed categories if they don't exist
   const categoryCount = await GameCategory.count();
@@ -281,5 +281,5 @@ app.delete('/categories/:id', authenticateAPIKey, async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Game Service listening on port ${port}`);
+  console.log(`Game Service listening on port ${port}`);
 });
