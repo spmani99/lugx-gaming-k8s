@@ -1,0 +1,12 @@
+{
+  "fileLocations": [
+      {
+          "URIPrefixes": [
+              "s3://lugx-analytics-data-files/click-events/"
+          ]
+      }
+  ],
+  "globalUploadSettings": {
+      "format": "JSON"
+  }
+}
